@@ -1,0 +1,216 @@
+{
+  "project_name": "HireMyFace",
+  "app_type": "hybrid_fullstack_marketplace",
+  "theme_strategy": {
+    "primary_theme": "Electric Violet & Deep Indigo Light Theme with Rich Dark Mode accents",
+    "background": "bg-slate-50",
+    "surface": "bg-white",
+    "primary_color": "#7C3AED",
+    "primary_hover": "#6D28D9",
+    "secondary_color": "#4F46E5",
+    "accent_color": "#EC4899",
+    "border_color": "#E2E8F0",
+    "dark_accent": "#1E1B4B",
+    "tagline": "The Face Of Your Business — Hire Video Creators & Presenters on Demand"
+  },
+  "color_palette": {
+    "primary": {
+      "50": "#F5F3FF",
+      "100": "#EDE9FE",
+      "200": "#DDD6FE",
+      "500": "#8B5CF6",
+      "600": "#7C3AED",
+      "700": "#6D28D9",
+      "900": "#4C1D95"
+    },
+    "indigo": {
+      "500": "#6366F1",
+      "600": "#4F46E5",
+      "900": "#1E1B4B"
+    },
+    "neutral": {
+      "bg": "#F8FAFC",
+      "card": "#FFFFFF",
+      "text_main": "#0F172A",
+      "text_muted": "#64748B",
+      "border": "#E2E8F0"
+    },
+    "status": {
+      "pending": "bg-amber-100 text-amber-800 border-amber-200",
+      "countered": "bg-purple-100 text-purple-800 border-purple-200",
+      "accepted": "bg-blue-100 text-blue-800 border-blue-200",
+      "paid": "bg-emerald-100 text-emerald-800 border-emerald-200",
+      "delivered": "bg-cyan-100 text-cyan-800 border-cyan-200",
+      "completed": "bg-green-100 text-green-800 border-green-200",
+      "declined": "bg-rose-100 text-rose-800 border-rose-200"
+    }
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Plus Jakarta Sans, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "hero_h1": "text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 leading-tight",
+    "section_h2": "text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight",
+    "card_title": "text-lg font-semibold text-slate-900",
+    "caption": "text-xs font-medium text-slate-500 tracking-wide uppercase"
+  },
+  "navigation_structure": {
+    "mobile": {
+      "bottom_nav": [
+        {"name": "Home", "icon": "HomeIcon", "path": "/app/feed", "data_testid": "nav-home"},
+        {"name": "Search", "icon": "MagnifyingGlassIcon", "path": "/app/search", "data_testid": "nav-search"},
+        {"name": "PlusFAB", "icon": "PlusIcon", "action": "open_role_chooser", "is_fab": true, "data_testid": "nav-plus-fab"},
+        {"name": "Deals", "icon": "BriefcaseIcon", "path": "/app/deals", "data_testid": "nav-deals"},
+        {"name": "Chat", "icon": "ChatBubbleLeftRightIcon", "path": "/app/chat", "data_testid": "nav-chat"},
+        {"name": "Profile", "icon": "UserIcon", "path": "/app/profile", "data_testid": "nav-profile"}
+      ]
+    },
+    "desktop": {
+      "left_sidebar": "Fixed 64 wide left sidebar with brand logo, nav links, active badge, Business Pro banner, and User account popover."
+    }
+  },
+  "key_features_and_views": {
+    "landing_page": {
+      "sections": [
+        "Navigation Header with Logo, How It Works, Plans, Creators, Sign In CTA",
+        "Hero Section with bold dynamic headline, instant search bar, badge '1,200+ Verified Presenters', and high impact creator media grid",
+        "How HireMyFace Works (3 simple steps: 1. Browse Creators, 2. Send Offer & Escrow, 3. Receive Promo Video)",
+        "Simplified Pricing Plans (Per Video starts from ₹499, Part-Time starting ₹8,000/mo, Full-Time starting ₹25,000/mo)",
+        "Business Pro Membership (₹999/mo with 0% commission & direct contacts)",
+        "Featured Creator Carousel/Grid with live video demo teasers & category filters",
+        "Footer with links, legal, social icons, and creator sign up prompt"
+      ]
+    },
+    "auth": {
+      "login_signup": "Instagram/LinkedIn style split screen layout on desktop with creator media spotlight on left, centered login/signup form on right (or clean single card on mobile). Supports Email/Password + 1-Click Google sign in simulation."
+    },
+    "role_chooser_modal": {
+      "trigger": "Triggered by '+' FAB button in bottom nav or top bar header",
+      "options": [
+        {
+          "title": "Become a Creator / Presenter",
+          "subtitle": "Get hired by brands to shoot UGC videos, reels & ads. Earn on your terms.",
+          "badge": "Monetize Your Face",
+          "action": "open_creator_onboarding"
+        },
+        {
+          "title": "Hire as a Business",
+          "subtitle": "Post a promo deal or send direct offers to top video presenters in minutes.",
+          "badge": "Boost Sales & Reach",
+          "action": "open_business_offer_form"
+        }
+      ]
+    },
+    "creator_onboarding": {
+      "steps": [
+        "Step 1: Personal Details & City/Languages (Name, Handle, Location, Spoken Languages, Bio)",
+        "Step 2: Creator Category & Video Samples (Categories: E-commerce, Tech, Fitness, Food, Fashion; Reel URLs)",
+        "Step 3: Pricing Setup (Per Video starting price, Part-time monthly rate, Full-time monthly rate, UPI ID for payouts)"
+      ]
+    },
+    "business_offer_form": {
+      "steps": [
+        "Step 1: Campaign Details (Product/Brand name, Video category, Target platform: Instagram Reel / YouTube Shorts / TikTok)",
+        "Step 2: Offer Type & Budget (Plan selection: Per Video / Part-time / Full-time, Price offered in ₹ INR, Deliverable deadlines, Script notes)"
+      ]
+    },
+    "home_feed": {
+      "components": [
+        "Top search bar with quick category chips (Reels, Ad Promo, Unboxing, Corporate, Voiceover)",
+        "Creator cards with profile photo, verified check mark, city, spoken languages, star rating, starting price tag ('From ₹999/video'), and favorite heart button",
+        "Quick action buttons: 'View Profile' and 'Send Offer'"
+      ]
+    },
+    "search_and_filters": {
+      "filters": [
+        "Category (E-commerce, Tech & SaaS, Health & Gym, Fashion, Food & Lifestyle)",
+        "City/Region (Mumbai, Delhi NCR, Bengaluru, Hyderabad, Remote/Online)",
+        "Language (English, Hindi, Hinglish, Tamil, Telugu, Kannada, Marathi)",
+        "Plan Model (Per Video, Part-time, Full-time)",
+        "Price Range slider (₹499 to ₹50,000+)",
+        "Gender & Age range",
+        "Sort By (Recommended, Top Rated, Price: Low to High, Price: High to Low)"
+      ]
+    },
+    "creator_profile": {
+      "components": [
+        "Banner & Profile Avatar with status badge ('Available for Hire')",
+        "Stats row (Videos Delivered, 4.9 Rating, Avg Response Time: 2 hrs)",
+        "Portfolio reel video preview cards with playable mock modals",
+        "3 Pricing Plan Cards (Per Video, Part-Time, Full-Time) with feature bullet points",
+        "'Send Offer' sticky CTA dialog"
+      ]
+    },
+    "deals_manager": {
+      "tabs": ["All Deals", "Pending", "Active Escrow", "In Review", "Completed", "Declined"],
+      "deal_card": "Brand/Creator info, offer amount in ₹, status badge, milestone progress, action buttons (Accept, Counter Offer, Pay Escrow, Upload Delivery Video, Mark Complete)"
+    },
+    "chat": {
+      "features": [
+        "Conversation list with online indicators and unread counters",
+        "Direct Messaging UI with timestamp, attachment preview, and offer snippet header",
+        "Safety Warning Alert: 'Notice: Sharing personal phone numbers/WhatsApp before deal acceptance violates terms & masks contact details for escrow protection.'"
+      ]
+    },
+    "business_pro_upgrade": {
+      "pricing": "₹999 / month",
+      "perks": [
+        "0% Escrow Commission Fee (save up to 15% per deal)",
+        "Unlimited Direct Offers to creators",
+        "Priority Creator Response & Verified Badge",
+        "Dedicated Campaign Manager support"
+      ]
+    },
+    "admin_dashboard": {
+      "tabs": [
+        "Overview Stats (Total GMV, Platform Revenue, Active Creators, Pending Deals)",
+        "Creator Approvals (Review application, verify portfolio video, approve/reject)",
+        "Escrow Monitor (Deals holding funds, manual release override)",
+        "Payout Requests (UPI payout queue, process payouts)"
+      ]
+    }
+  },
+  "image_urls": {
+    "creators": [
+      {
+        "url": "https://images.unsplash.com/photo-1628619487925-e9b8fc4c6b08?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHw0fHxpbmRpYW4lMjBjcmVhdG9yJTIwY29udGVudCUyMHByZXNlbnRlciUyMGluZmx1ZW5jZXIlMjBzbWlsZSUyMHBvcnRyYWl0fGVufDB8fHx8MTc5MxE4NDc1NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Rahul Sharma - Tech & SaaS Presenter"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1598966739654-5e9a252d8c32?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHszfHxpbmRpYW4lMjBjcmVhdG9yJTIwY29udGVudCUyMHByZXNlbnRlciUyMGluZmx1ZW5jZXIlMjBzbWlsZSUyMHBvcnRyYWl0fGVufDB8fHx8MTc5MxE4NDc1NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Vikram Patel - Fitness & Lifestyle Creator"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1749700332031-cf99864959ea?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwyfHxpbmRpYW4lMjBjcmVhdG9yJTIwY29udGVudCUyMHByZXNlbnRlciUyMGluZmx1ZW5jZXIlMjBzbWlsZSUyMHBvcnRyYWl0fGVufDB8fHx8MTc5MxE4NDc1NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Ananya Roy - E-commerce & Fashion UGC Face"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1662850886700-4ec19bd30d11?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjBjcmVhdG9yJTIwY29udGVudCUyMHByZXNlbnRlciUyMGluZmx1ZW5jZXIlMjBzbWlsZSUyMHBvcnRyYWl0fGVufDB8fHx8MTc5MxE4NDc1NXww&ixlib=rb-4.1.0&q=85",
+        "description": "Priya Kapoor - Food & D2C Presenter"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1618746647602-1384364ac94b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHwxfHx2aWRlbyUyMHByZXNlbnRlciUyMHZsb2dnZXIlMjBzdHVkaW8lMjBwb3J0cmFpdCUyMGZhc2hpb24lMjBzb2NpYWwlMjBtZWRpYXxlbnwwfHx8fDE3OTMxODQ3NTV8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Sofia Verma - Studio Presenter & Actor"
+      }
+    ],
+    "studios": [
+      {
+        "url": "https://images.unsplash.com/photo-1744686909358-915e14866592?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHw0fHx2aWRlbyUyMHByZXNlbnRlciUyMHZsb2dnZXIlMjBzdHVkaW8lMjBwb3J0cmFpdCUyMGZhc2hpb24lMjBzb2NpYWwlMjBtZWRpYXxlbnwwfHx8fDE3OTMxODQ3NTV8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Studio Shooting & Editing Setup"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1753162660995-52218587ce71?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHwzfHx2aWRlbyUyMHByZXNlbnRlciUyMHZsb2dnZXIlMjBzdHVkaW8lMjBwb3J0cmFpdCUyMGZhc2hpb24lMjBzb2NpYWwlMjBtZWRpYXxlbnwwfHx8fDE3OTMxODQ3NTV8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Duo Content Creators Filming UGC Reel"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure all interactive elements have data-testid attributes (e.g., data-testid='login-submit-button', data-testid='plus-fab-button').",
+    "Use standard JS / JSX code files (no TypeScript extensions like .tsx).",
+    "Implement the '+' FAB role chooser in the home page bottom navigation, opening a sheet modal allowing users to choose 'Become a Creator' (3-step form) or 'Hire as a Business' (2-step offer form).",
+    "Use Lucide React or Phosphor Icons for crisp visual cues across navigation, cards, status badges, and buttons.",
+    "Include realistic Indian currency ₹ (INR) pricing and plans: Per Video (Starts at ₹499 - ₹2,999), Part-Time (₹8,000 - ₹20,000/mo), Full-Time (₹25,000 - ₹60,000/mo) and Business Pro Subscription (₹999/mo).",
+    "Provide interactive state switches (Creator mode vs Business mode) in profile and global headers so users can seamlessly explore both sides of the marketplace.",
+    "Deliver a complete, workable app with rich mock data, deal pipeline transitions, chat thread simulations, notification feed, and admin review panel."
+  ]
+}
