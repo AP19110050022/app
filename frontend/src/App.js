@@ -19,6 +19,10 @@ import Saved from "@/pages/Saved";
 import Upgrade from "@/pages/Upgrade";
 import Profile from "@/pages/Profile";
 import Admin from "@/pages/Admin";
+import SettingsPage from "@/pages/Settings";
+import Posts from "@/pages/Posts";
+import Jobs from "@/pages/Jobs";
+import BusinessProfile from "@/pages/BusinessProfile";
 
 const Protected = () => (
   <>
@@ -49,6 +53,10 @@ function App() {
             <Route path="upgrade" element={<Upgrade />} />
             <Route path="profile" element={<Profile />} />
             <Route path="admin" element={<Admin />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="posts" element={<Posts />} />
+            <Route path="jobs" element={<Jobs />} />
+            <Route path="business/:id" element={<BusinessProfile />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

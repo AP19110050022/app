@@ -3,11 +3,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { UtensilsCrossed, Shirt, Sparkles, Dumbbell, Home, GraduationCap, Cpu, ShoppingBag, Megaphone, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ChipSelect } from "@/components/ChipSelect";
 import { ImagePicker } from "@/components/ImagePicker";
 import { Field } from "@/components/Stepper";
 import { SetupFrame } from "@/components/SetupFrame";
-import { CITIES, LANGUAGES, BUDGETS, PLANS } from "@/constants/options";
+import { LANGUAGES, BUDGETS, PLANS } from "@/constants/options";
+import { LocationField } from "@/components/LocationPicker";
 import { useMe } from "@/context/MeContext";
 import { errMsg } from "@/lib/api";
 
@@ -16,7 +18,7 @@ const INDUSTRY_TILES = [
   { id: "Fitness & gym", icon: Dumbbell }, { id: "Real estate", icon: Home }, { id: "Education", icon: GraduationCap },
   { id: "Tech & startup", icon: Cpu }, { id: "E-commerce", icon: ShoppingBag }, { id: "Agency", icon: Megaphone }, { id: "Something else", icon: MoreHorizontal },
 ];
-const BLANK = { company: "", logo: "", industry: "", city: "", website: "", phone: "", need_plan: "per_video", budget: "", languages: [] };
+const BLANK = { company: "", logo: "", industry: "", city: "", website: "", phone: "", need_plans: ["per_video"], budget: "", languages: [], description: "" };
 
 export default function BusinessSetup() {
   const { me, api, refresh } = useMe();
@@ -24,10 +26,10 @@ export default function BusinessSetup() {
   const [params] = useSearchParams();
   const editing = !!me.business;
   const [f, setF] = useState({ ...BLANK, ...(me.business || {}) });
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => (params.get("step") === "1" ? 1 : 0));
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v?.target ? v.target.value : v }));
-  const valid = [f.company.trim().length >= 2 && f.industry && f.city, !!f.budget];
+  const valid = [f.company.trim().length >= 2 && f.industry && f.city, !!f.budget && f.need_plans.length > 0];
 
   const save = async () => {
     setBusy(true);
@@ -50,9 +52,8 @@ export default function BusinessSetup() {
           <ImagePicker value={f.logo} onChange={set("logo")} testid="business-logo" round={false} label="Logo (optional)" />
           <Field label="Business name"><Input value={f.company} onChange={set("company")} data-testid="business-company-input" /></Field>
           <Field label="What type of business do you run?"><ChipSelect tiles options={INDUSTRY_TILES} value={f.industry} onChange={set("industry")} testid="business-industry" /></Field>
-          <Field label="City">
-            <Input list="bcities" value={f.city} onChange={set("city")} placeholder="Type or pick your city" data-testid="business-city-input" />
-            <datalist id="bcities">{CITIES.map((c) => <option key={c} value={c} />)}</datalist>
+          <Field label="City or town">
+            <LocationField value={f} onChange={(l) => setF((p) => ({ ...p, city: l.city, state: l.state, lat: l.lat, lng: l.lng }))} testid="business-city-input" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Website / Instagram"><Input value={f.website} onChange={set("website")} placeholder="@brand" data-testid="business-website-input" /></Field>
@@ -61,15 +62,16 @@ export default function BusinessSetup() {
         </>
       ) : (
         <>
-          <Field label="Which plan do you usually need?">
+          <Field label="About your business (optional)"><Textarea rows={3} maxLength={500} value={f.description} onChange={set("description")} placeholder="What you sell and who your customers are" data-testid="business-description-input" /></Field>
+          <Field label="Which plans do you need? (pick one or more)">
             <div className="space-y-2.5">
-              {PLANS.map((p) => (
-                <button type="button" key={p.id} onClick={() => set("need_plan")(p.id)} data-testid={`business-need-${p.id}`}
-                  className={`flex w-full items-center gap-3 rounded-[22px] border p-4 text-left transition-colors ${f.need_plan === p.id ? "border-white bg-white text-[#3B25A8]" : "border-white/25 bg-white/10 hover:bg-white/20"}`}>
+              {PLANS.map((p) => { const sel = f.need_plans.includes(p.id); return (
+                <button type="button" key={p.id} onClick={() => set("need_plans")(sel ? f.need_plans.filter((x) => x !== p.id) : [...f.need_plans, p.id])} data-testid={`business-need-${p.id}`}
+                  className={`flex w-full items-center gap-3 rounded-[22px] border p-4 text-left transition-colors ${sel ? "border-white bg-white text-[#3B25A8]" : "border-white/25 bg-white/10 hover:bg-white/20"}`}>
                   <p.icon className="h-6 w-6 shrink-0" />
                   <div><p className="font-extrabold">{p.label}</p><p className="text-[13px] opacity-75">{p.short}</p></div>
                 </button>
-              ))}
+              ); })}
             </div>
           </Field>
           <Field label="Typical budget"><ChipSelect options={BUDGETS} value={f.budget} onChange={set("budget")} testid="business-budget" /></Field>

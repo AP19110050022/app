@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Bookmark, MapPin, Star } from "lucide-react";
 import { inr } from "@/lib/api";
+import { PLAN_BY_ID } from "@/constants/options";
 
 export const CreatorCard = ({ c, saved, onToggleSave, to, index = 0 }) => (
   <div className="rise group relative" style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }} data-testid={`creator-card-${c.user_id}`}>
@@ -8,7 +9,7 @@ export const CreatorCard = ({ c, saved, onToggleSave, to, index = 0 }) => (
       <img src={c.photo} alt={c.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,5,40,.28)_0%,rgba(10,5,40,0)_26%,rgba(10,5,40,0)_42%,rgba(10,5,40,.92)_100%)]" />
       <div className="absolute left-2.5 right-12 top-2.5 flex flex-wrap gap-1">
-        <span className="flex h-[22px] items-center rounded-full bg-[rgba(10,5,40,.5)] px-2.5 text-[10.5px] font-bold backdrop-blur">{c.category}</span>
+        {(c.plans || []).map((p) => <span key={p} className="flex h-[22px] items-center rounded-full bg-[rgba(10,5,40,.5)] px-2.5 text-[10.5px] font-bold backdrop-blur" data-testid={`card-plan-${p}`}>{PLAN_BY_ID[p]?.label}</span>)}
         {c.is_sample && <span className="flex h-[22px] items-center rounded-full bg-[rgba(10,5,40,.5)] px-2.5 text-[10.5px] font-bold backdrop-blur">Sample</span>}
       </div>
       <div className="absolute inset-x-3 bottom-3">
@@ -16,13 +17,13 @@ export const CreatorCard = ({ c, saved, onToggleSave, to, index = 0 }) => (
           <b className="truncate">{c.name}</b>
           <span className="h-2 w-2 shrink-0 rounded-full bg-[#5CE0A0] shadow-[0_0_8px_#5CE0A0]" />
         </div>
-        <p className="truncate text-xs opacity-90">{(c.languages || []).slice(0, 3).join(" · ")}</p>
+        <p className="truncate text-xs opacity-90">{(c.categories || [c.category]).join(" · ")}</p>
         <p className="flex items-center gap-2 truncate text-xs opacity-90">
-          <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" />{c.city}</span>
+          <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" />{c.distance_km != null ? `${c.city} · ${c.distance_km < 1 ? "<1" : Math.round(c.distance_km)} km` : c.city}</span>
           {c.rating_count > 0 && <span className="flex items-center gap-0.5"><Star className="h-3 w-3 fill-amber-300 text-amber-300" />{c.rating_avg}</span>}
         </p>
         <span className="mt-2 inline-flex h-[26px] items-center whitespace-nowrap rounded-full bg-white px-3 text-[11.5px] font-extrabold text-[#3B25A8]" data-testid={`creator-card-price-${c.user_id}`}>
-          from {inr(c.rate_per_video)} / video
+          from {inr(c.from_price ?? c.rate_per_video)} {PLAN_BY_ID[c.from_plan || "per_video"]?.unit.replace("/", "/ ")}
         </span>
       </div>
     </Link>

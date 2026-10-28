@@ -24,9 +24,11 @@ load_dotenv(ROOT_DIR / '.env')
 try:  # launched as `backend.server` (the default)
     from backend.clerk_auth import clerk_router, require_user
     from backend.seed import sample_creator_docs
+    from backend import locations as geo
 except ModuleNotFoundError:  # launched from inside backend/ as `server`
     from clerk_auth import clerk_router, require_user
     from seed import sample_creator_docs
+    import locations as geo
 
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
 db = client[os.environ['DB_NAME']]
@@ -116,8 +118,14 @@ def is_pro(member: dict) -> bool:
     return bool(pu) and datetime.fromisoformat(pu) > now()
 
 
+PREF_OF = {"offer": "offers", "message": "messages", "deal": "deals", "payment": "deals", "payout": "deals", "rating": "deals", "interest": "offers"}
+
+
 async def notify(user_id: str, kind: str, text: str, link: str = ""):
     if user_id.startswith("sample_"):
+        return
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "notify_prefs": 1})
+    if u and (u.get("notify_prefs") or {}).get(PREF_OF.get(kind, ""), True) is False:
         return
     await db.notifications.insert_one({"id": new_id(), "user_id": user_id, "kind": kind, "text": text,
                                        "link": link, "read": False, "created_at": iso()})
@@ -128,19 +136,22 @@ class CreatorIn(BaseModel):
     name: str = Field(min_length=2, max_length=60)
     photo: str = Field(min_length=5, max_length=900_000)
     city: str = Field(min_length=2, max_length=60)
-    category: str = Field(min_length=2, max_length=40)
+    state: str = Field("", max_length=60)
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
+    categories: List[str] = Field(min_length=1, max_length=4)
     gender: Literal["Female", "Male", "Other"]
     languages: List[str] = Field(min_length=1, max_length=8)
     bio: str = Field("", max_length=500)
     intro_video: str = Field("", max_length=500)
-    samples: List[str] = Field(default_factory=list, max_length=6)
+    samples: List[str] = Field(default_factory=list, max_length=12)
     instagram: str = Field("", max_length=200)
     youtube: str = Field("", max_length=200)
     followers: int = Field(0, ge=0)
     phone: str = Field("", max_length=20)
-    rate_per_video: int = Field(ge=100, le=10_000_000)
-    rate_part_time: int = Field(ge=500, le=10_000_000)
-    rate_full_time: int = Field(ge=500, le=10_000_000)
+    rate_per_video: Optional[int] = Field(None, ge=100, le=10_000_000)
+    rate_part_time: Optional[int] = Field(None, ge=500, le=10_000_000)
+    rate_full_time: Optional[int] = Field(None, ge=500, le=10_000_000)
 
 
 class BusinessIn(BaseModel):
@@ -148,16 +159,47 @@ class BusinessIn(BaseModel):
     logo: str = Field("", max_length=900_000)
     industry: str = Field(min_length=2, max_length=40)
     city: str = Field(min_length=2, max_length=60)
+    state: str = Field("", max_length=60)
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
     website: str = Field("", max_length=200)
     phone: str = Field("", max_length=20)
-    need_plan: PlanT
+    need_plans: List[PlanT] = Field(min_length=1, max_length=3)
     budget: str = Field(min_length=1, max_length=40)
     languages: List[str] = Field(default_factory=list, max_length=8)
+    description: str = Field("", max_length=500)
+
+
+class JobIn(BaseModel):
+    title: str = Field(min_length=4, max_length=80)
+    description: str = Field(min_length=10, max_length=1500)
+    plans: List[PlanT] = Field(min_length=1, max_length=3)
+    budget: str = Field(min_length=1, max_length=40)
+    languages: List[str] = Field(default_factory=list, max_length=8)
+    status: Literal["open", "paused", "closed"] = "open"
+
+
+class InterestIn(BaseModel):
+    note: str = Field("", max_length=500)
+
+
+class InterestStatusIn(BaseModel):
+    status: Literal["shortlisted", "declined", "offered"]
+
+
+class VisibilityIn(BaseModel):
+    kind: Literal["creator", "business"]
+    live: bool
+
+
+class PostsIn(BaseModel):
+    posts: List[str] = Field(max_length=12)
 
 
 class MeUpdate(BaseModel):
     active_mode: Optional[Literal["creator", "business"]] = None
     payout_upi: Optional[str] = Field(None, max_length=80)
+    notify_prefs: Optional[dict] = None
 
 
 class OfferIn(BaseModel):
@@ -267,6 +309,79 @@ PLAN_LABEL = {"per_video": "Per Video", "part_time": "Part-time", "full_time": "
 RATE_FIELD = {"per_video": "rate_per_video", "part_time": "rate_part_time", "full_time": "rate_full_time"}
 
 
+def with_plans(data: dict) -> dict:
+    rates = [(p, data.get(RATE_FIELD[p])) for p in PLANS]
+    offered = [p for p, r in rates if r]
+    if not offered:
+        raise HTTPException(400, "Offer at least one plan with a price")
+    data["plans"] = offered
+    data["category"] = data["categories"][0]
+    data["from_plan"] = offered[0]
+    data["from_price"] = data[RATE_FIELD[offered[0]]]
+    return data
+
+
+def with_geo(data: dict) -> dict:
+    c = geo.lookup(data["city"], data.get("state", ""))
+    lat, lng = data.pop("lat", None), data.pop("lng", None)
+    if c:
+        data["city"], data["state"] = c["name"], c["state"]
+        if lat is None or lng is None:
+            lat, lng = c["lat"], c["lng"]
+    data["loc"] = {"type": "Point", "coordinates": [lng, lat]} if lat is not None and lng is not None else None
+    return data
+
+
+def apply_location(query: dict, state: str, city: str, lat: Optional[float], lng: Optional[float], radius_km: int):
+    if lat is not None and lng is not None and radius_km > 0:
+        query["loc"] = {"$geoWithin": {"$centerSphere": [[lng, lat], radius_km / 6378.1]}}
+    elif city:
+        query["city"] = {"$regex": f"^{re.escape(city)}$", "$options": "i"}
+        if state:
+            query["state"] = state
+    elif state:
+        query["state"] = state
+
+
+def add_distance(docs: list, lat: Optional[float], lng: Optional[float], by_distance: bool) -> list:
+    for d in docs:
+        loc = d.pop("loc", None)
+        if lat is not None and lng is not None and loc:
+            d["distance_km"] = round(geo.haversine_km(lat, lng, loc["coordinates"][1], loc["coordinates"][0]), 1)
+    if by_distance and lat is not None:
+        docs.sort(key=lambda d: d.get("distance_km", 1e9))
+    return docs
+
+
+# ---------- locations ----------
+@api.get("/locations/states")
+async def location_states():
+    counts = {}
+    for c in geo.CITIES:
+        counts[c["state"]] = counts.get(c["state"], 0) + 1
+    return [{"state": s, "cities": counts[s]} for s in geo.STATES]
+
+
+@api.get("/locations/cities")
+async def location_cities(state: str, q: str = ""):
+    rows = geo.cities_in(state)
+    if q:
+        rows = [c for c in rows if q.lower() in c["name"].lower()]
+    return rows[:300]
+
+
+@api.get("/locations/search")
+async def location_search(q: str):
+    ql = q.strip().lower()
+    states = [s for s in geo.STATES if ql and ql in s.lower()][:5]
+    return {"states": states, "cities": geo.search(q)}
+
+
+@api.get("/locations/nearest")
+async def location_nearest(lat: float, lng: float):
+    return geo.nearest(lat, lng)
+
+
 # ---------- public ----------
 @api.get("/")
 async def root():
@@ -280,32 +395,34 @@ async def config():
 
 
 @api.get("/creators")
-async def list_creators(q: str = "", category: str = "", city: str = "", language: str = "", plan: str = "",
+async def list_creators(q: str = "", category: str = "", city: str = "", state: str = "", lat: Optional[float] = None,
+                        lng: Optional[float] = None, radius_km: int = 0, language: str = "", plan: str = "",
                         gender: str = "", min_price: int = 0, max_price: int = 0, sort: str = "recommended", limit: int = 60):
-    query = {"status": "approved"}
+    query = {"status": "approved", "live": {"$ne": False}}
     if q:
         rx = {"$regex": re.escape(q), "$options": "i"}
-        query["$or"] = [{"name": rx}, {"city": rx}, {"category": rx}, {"bio": rx}]
+        query["$or"] = [{"name": rx}, {"city": rx}, {"state": rx}, {"categories": rx}, {"bio": rx}]
     if category:
-        query["category"] = category
-    if city:
-        query["city"] = {"$regex": f"^{re.escape(city)}$", "$options": "i"}
+        query["categories"] = category
+    apply_location(query, state, city, lat, lng, radius_km)
     if language:
         query["languages"] = language
     if gender:
         query["gender"] = gender
-    field = RATE_FIELD.get(plan, "rate_per_video")
+    field = RATE_FIELD.get(plan, "from_price")
+    if plan in RATE_FIELD:
+        query[field] = {"$ne": None}
     if min_price or max_price:
         query[field] = {**({"$gte": min_price} if min_price else {}), **({"$lte": max_price} if max_price else {})}
     order = {"price_asc": [(field, 1)], "price_desc": [(field, -1)], "newest": [("created_at", -1)],
              "rating": [("rating_avg", -1)]}.get(sort, [("rating_avg", -1), ("rating_count", -1)])
     docs = await db.creators.find(query, {"_id": 0, "phone": 0, "samples": 0}).sort(order).to_list(min(limit, 100))
-    return docs
+    return add_distance(docs, lat, lng, sort == "nearest" or (sort == "recommended" and radius_km > 0))
 
 
 @api.get("/creators/{creator_id}")
 async def get_creator(creator_id: str):
-    c = await db.creators.find_one({"user_id": creator_id, "status": "approved"}, {"_id": 0, "phone": 0})
+    c = await db.creators.find_one({"user_id": creator_id, "status": "approved"}, {"_id": 0, "phone": 0, "loc": 0})
     if not c:
         raise HTTPException(404, "Creator not found")
     reviews = await db.deals.find({"creator_id": creator_id, "rating": {"$ne": None}},
@@ -323,6 +440,7 @@ async def me(member: dict = Depends(current_member)):
     month_start = now().replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
     offers_this_month = await db.deals.count_documents({"business_id": uid, "created_at": {"$gte": month_start}})
     return {"user": member, "creator": creator, "business": business, "is_pro": is_pro(member),
+            "jobs_count": await db.jobs.count_documents({"business_id": uid}),
             "unread_notifications": unread, "offers_this_month": offers_this_month}
 
 
@@ -351,35 +469,165 @@ async def delete_me(member: dict = Depends(current_member)):
 async def upsert_creator(body: CreatorIn, member: dict = Depends(current_member)):
     uid = member["user_id"]
     existing = await db.creators.find_one({"user_id": uid}, {"_id": 0})
-    data = body.model_dump()
+    data = with_plans(with_geo(body.model_dump()))
     if existing:
         relist = existing.get("status") == "approved" and (data["name"] != existing.get("name") or data["photo"] != existing.get("photo"))
         await db.creators.update_one({"user_id": uid}, {"$set": {**data, "updated_at": iso(), **({"status": "pending"} if relist else {})}})
         if relist:
             await notify(uid, "approval", "You changed your name or photo, so your profile is back under a quick review.", "/app/profile")
     else:
-        await db.creators.insert_one({**data, "user_id": uid, "status": "pending", "rating_avg": 0, "rating_count": 0,
+        await db.creators.insert_one({**data, "user_id": uid, "status": "pending", "live": True, "rating_avg": 0, "rating_count": 0,
                                       "deals_done": 0, "created_at": iso()})
         await db.users.update_one({"user_id": uid}, {"$set": {"active_mode": "creator"}})
         await notify(uid, "approval", "Your creator profile is submitted. It goes live once our team approves it.", "/app/profile")
-    return await db.creators.find_one({"user_id": uid}, {"_id": 0})
+    return await db.creators.find_one({"user_id": uid}, {"_id": 0, "loc": 0})
 
 
 @api.put("/businesses/me")
 async def upsert_business(body: BusinessIn, member: dict = Depends(current_member)):
     uid = member["user_id"]
     existing = await db.businesses.find_one({"user_id": uid})
-    await db.businesses.update_one({"user_id": uid}, {"$set": {**body.model_dump(), "updated_at": iso()},
-                                                     "$setOnInsert": {"user_id": uid, "created_at": iso()}}, upsert=True)
+    await db.businesses.update_one({"user_id": uid}, {"$set": {**with_geo(body.model_dump()), "updated_at": iso()},
+                                                     "$setOnInsert": {"user_id": uid, "live": True, "created_at": iso()}}, upsert=True)
     if not existing:
         await db.users.update_one({"user_id": uid}, {"$set": {"active_mode": "business"}})
-    return await db.businesses.find_one({"user_id": uid}, {"_id": 0})
+    return await db.businesses.find_one({"user_id": uid}, {"_id": 0, "loc": 0})
+
+
+# ---------- visibility, posts, jobs ----------
+@api.patch("/me/visibility")
+async def set_visibility(body: VisibilityIn, member: dict = Depends(current_member)):
+    col = db.creators if body.kind == "creator" else db.businesses
+    r = await col.update_one({"user_id": member["user_id"]}, {"$set": {"live": body.live}})
+    if not r.matched_count:
+        raise HTTPException(404, "Profile not found")
+    return {"ok": True}
+
+
+@api.put("/creators/me/posts")
+async def set_posts(body: PostsIn, member: dict = Depends(current_member)):
+    if any(len(p) > 900_000 for p in body.posts):
+        raise HTTPException(400, "Image too large")
+    r = await db.creators.update_one({"user_id": member["user_id"]}, {"$set": {"samples": body.posts}})
+    if not r.matched_count:
+        raise HTTPException(404, "Create your creator profile first")
+    return {"ok": True}
+
+
+JOB_PUBLIC = {"_id": 0, "loc": 0}
+
+
+async def my_business(uid: str) -> dict:
+    b = await db.businesses.find_one({"user_id": uid}, {"_id": 0})
+    if not b:
+        raise HTTPException(400, "Create your business profile first")
+    return b
+
+
+@api.post("/jobs")
+async def create_job(body: JobIn, member: dict = Depends(current_member)):
+    b = await my_business(member["user_id"])
+    job = {**body.model_dump(), "id": new_id(), "business_id": b["user_id"], "company": b["company"], "logo": b.get("logo", ""),
+           "industry": b["industry"], "city": b["city"], "state": b.get("state", ""), "loc": b.get("loc"), "interested": 0,
+           "created_at": iso(), "updated_at": iso()}
+    await db.jobs.insert_one({**job})
+    job.pop("loc", None)
+    return job
+
+
+@api.put("/jobs/{job_id}")
+async def update_job(job_id: str, body: JobIn, member: dict = Depends(current_member)):
+    r = await db.jobs.update_one({"id": job_id, "business_id": member["user_id"]}, {"$set": {**body.model_dump(), "updated_at": iso()}})
+    if not r.matched_count:
+        raise HTTPException(404, "Job not found")
+    return await db.jobs.find_one({"id": job_id}, JOB_PUBLIC)
+
+
+@api.delete("/jobs/{job_id}")
+async def delete_job(job_id: str, member: dict = Depends(current_member)):
+    r = await db.jobs.delete_one({"id": job_id, "business_id": member["user_id"]})
+    if not r.deleted_count:
+        raise HTTPException(404, "Job not found")
+    await db.interests.delete_many({"job_id": job_id})
+    return {"ok": True}
+
+
+@api.get("/jobs/mine")
+async def my_jobs(member: dict = Depends(current_member)):
+    jobs = await db.jobs.find({"business_id": member["user_id"]}, JOB_PUBLIC).sort("created_at", -1).to_list(200)
+    ints = await db.interests.find({"job_id": {"$in": [j["id"] for j in jobs]}}, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    for j in jobs:
+        j["interests"] = [i for i in ints if i["job_id"] == j["id"]]
+    return jobs
+
+
+@api.get("/jobs")
+async def list_jobs(state: str = "", city: str = "", lat: Optional[float] = None, lng: Optional[float] = None,
+                    radius_km: int = 0, plan: str = "", member: dict = Depends(current_member)):
+    live_biz = [b["user_id"] for b in await db.businesses.find({"live": {"$ne": False}}, {"user_id": 1}).to_list(5000)]
+    query = {"status": "open", "business_id": {"$in": live_biz}}
+    if plan in RATE_FIELD:
+        query["plans"] = plan
+    apply_location(query, state, city, lat, lng, radius_km)
+    jobs = add_distance(await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(200), lat, lng, radius_km > 0)
+    mine = {i["job_id"] for i in await db.interests.find({"creator_id": member["user_id"]}, {"job_id": 1}).to_list(2000)}
+    for j in jobs:
+        j["applied"] = j["id"] in mine
+    return jobs
+
+
+@api.get("/businesses/{biz_id}")
+async def business_profile(biz_id: str, _: dict = Depends(current_member)):
+    b = await db.businesses.find_one({"user_id": biz_id}, {"_id": 0, "phone": 0, "loc": 0})
+    if not b:
+        raise HTTPException(404, "Business not found")
+    jobs = await db.jobs.find({"business_id": biz_id, "status": "open"}, JOB_PUBLIC).sort("created_at", -1).to_list(50)
+    return {**b, "jobs": jobs}
+
+
+@api.post("/jobs/{job_id}/interest")
+async def show_interest(job_id: str, body: InterestIn, member: dict = Depends(current_member)):
+    c = await db.creators.find_one({"user_id": member["user_id"]}, {"_id": 0})
+    if not c:
+        raise HTTPException(400, "Create your creator profile first")
+    job = await db.jobs.find_one({"id": job_id, "status": "open"}, {"_id": 0})
+    if not job:
+        raise HTTPException(404, "This job is no longer open")
+    if job["business_id"] == member["user_id"]:
+        raise HTTPException(400, "This is your own job")
+    doc = {"id": new_id(), "job_id": job_id, "job_title": job["title"], "business_id": job["business_id"], "company": job["company"],
+           "creator_id": c["user_id"], "creator_name": c["name"], "creator_photo": c["photo"], "from_price": c.get("from_price"),
+           "note": body.note, "status": "sent", "created_at": iso()}
+    r = await db.interests.update_one({"job_id": job_id, "creator_id": c["user_id"]}, {"$setOnInsert": doc}, upsert=True)
+    if r.upserted_id:
+        await db.jobs.update_one({"id": job_id}, {"$inc": {"interested": 1}})
+        await notify(job["business_id"], "interest", f"{c['name']} is interested in your job '{job['title']}'", "/app/jobs")
+    return {"ok": True}
+
+
+@api.get("/interests/mine")
+async def my_interests(member: dict = Depends(current_member)):
+    return await db.interests.find({"creator_id": member["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+
+@api.patch("/interests/{interest_id}")
+async def set_interest(interest_id: str, body: InterestStatusIn, member: dict = Depends(current_member)):
+    i = await db.interests.find_one_and_update({"id": interest_id, "business_id": member["user_id"]}, {"$set": {"status": body.status}}, projection={"_id": 0})
+    if not i:
+        raise HTTPException(404, "Not found")
+    if body.status != "offered":
+        await notify(i["creator_id"], "interest", f"{i['company']} {'shortlisted' if body.status == 'shortlisted' else 'passed on'} you for '{i['job_title']}'", "/app/jobs")
+    return {"ok": True}
 
 
 # ---------- saved ----------
 @api.get("/businesses")
-async def list_businesses(_: dict = Depends(current_member)):
-    return await db.businesses.find({}, {"_id": 0, "phone": 0}).sort("created_at", -1).to_list(200)
+async def list_businesses(state: str = "", city: str = "", lat: Optional[float] = None, lng: Optional[float] = None,
+                          radius_km: int = 0, _: dict = Depends(current_member)):
+    query = {}
+    apply_location(query, state, city, lat, lng, radius_km)
+    docs = await db.businesses.find(query, {"_id": 0, "phone": 0}).sort("created_at", -1).to_list(200)
+    return add_distance(docs, lat, lng, radius_km > 0)
 
 
 @api.get("/saved")
@@ -424,6 +672,8 @@ async def create_deal(body: OfferIn, member: dict = Depends(current_member)):
         raise HTTPException(404, "Creator not found")
     if body.creator_id == uid:
         raise HTTPException(400, "You can't send an offer to yourself")
+    if not creator.get(RATE_FIELD[body.plan]):
+        raise HTTPException(400, f"{creator['name']} doesn't offer the {PLAN_LABEL[body.plan]} plan")
     if not is_pro(member):
         month_start = now().replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
         if await db.deals.count_documents({"business_id": uid, "created_at": {"$gte": month_start}}) >= FREE_OFFER_LIMIT:
@@ -701,6 +951,21 @@ async def startup():
     if not await db.creators.find_one({"is_sample": True}):
         await db.creators.insert_many(sample_creator_docs())
     await db.creators.update_many({"is_sample": True}, {"$set": {"rating_avg": 0, "rating_count": 0, "deals_done": 0}})
+    for col in (db.creators, db.businesses):
+        await col.update_many({"live": {"$exists": False}}, {"$set": {"live": True}})
+    async for d in db.creators.find({"plans": {"$exists": False}}, {"_id": 0}):
+        d.setdefault("categories", [d.get("category", "Other")])
+        p = with_plans(d)
+        await db.creators.update_one({"user_id": d["user_id"]}, {"$set": {k: p[k] for k in ("categories", "plans", "from_plan", "from_price", "category")}})
+    async for d in db.businesses.find({"need_plans": {"$exists": False}}, {"_id": 0, "user_id": 1, "need_plan": 1}):
+        await db.businesses.update_one({"user_id": d["user_id"]}, {"$set": {"need_plans": [d.get("need_plan") or "per_video"]}})
+    await db.jobs.create_index("id", unique=True)
+    await db.interests.create_index([("job_id", 1), ("creator_id", 1)], unique=True)
+    for col in (db.creators, db.businesses):
+        async for d in col.find({"loc": {"$exists": False}}, {"_id": 0, "user_id": 1, "city": 1, "state": 1}):
+            g = with_geo({"city": d.get("city", ""), "state": d.get("state", "")})
+            await col.update_one({"user_id": d["user_id"]}, {"$set": g})
+        await col.create_index([("loc", "2dsphere")])
     await db.creators.create_index("user_id", unique=True)
     await db.deals.create_index("id", unique=True)
     await db.messages.create_index("deal_id")

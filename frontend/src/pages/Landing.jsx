@@ -17,7 +17,7 @@ const Peek = () => {
           <div className="absolute inset-0 bg-gradient-to-t from-[rgba(10,5,40,.9)] via-transparent to-transparent" />
           <div className="absolute inset-x-2.5 bottom-2.5">
             <p className="flex items-center gap-1 truncate text-sm font-extrabold">{c.name}<span className="h-1.5 w-1.5 rounded-full bg-[#5CE0A0]" /></p>
-            <span className="mt-1 inline-flex h-6 items-center rounded-full bg-white px-2.5 text-[10.5px] font-extrabold text-[#3B25A8]">from {inr(c.rate_per_video)}</span>
+            <span className="mt-1 inline-flex h-6 items-center rounded-full bg-white px-2.5 text-[10.5px] font-extrabold text-[#3B25A8]">from {inr(c.from_price ?? c.rate_per_video)}</span>
           </div>
         </Link>
       ))}

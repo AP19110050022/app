@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { Camera } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-function resize(file, max = 640) {
+export function resizeImage(file, max = 640) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
@@ -24,7 +24,7 @@ export const ImagePicker = ({ value, onChange, testid, round = true, label = "Up
   const ref = useRef(null);
   const pick = async (e) => {
     const f = e.target.files?.[0];
-    if (f) onChange(await resize(f));
+    if (f) onChange(await resizeImage(f));
   };
   return (
     <div className="flex items-center gap-4">

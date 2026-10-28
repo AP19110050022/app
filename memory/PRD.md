@@ -21,6 +21,9 @@ One account, + chooser (creator 3 steps / business 2 steps); 3 plans Per Video /
 - Fixes after test: atomic/idempotent payment verify (deal must be accepted), date not masked as phone, name/photo change re-queues approval, saved validates target, sample creators show no fake ratings, logout → landing, specific deal toasts.
 - Saved now supports creators and businesses; top bar: Search, Saved, Notifications.
 
+- Location (OLX-style): 6,413 Indian cities/towns (GeoNames ≥5k pop, incl. tier 2/3) in backend/data/in_cities.json; picker with All India / state / city / GPS; distance chips (only city, 10–250 km); 2dsphere geo search, "X km" on cards, nearest-first; used for creators, businesses and setup forms.
+- Razorpay keys requested via secure card (real payments turn on once added).
+
 ## Backlog
 - P0: Add Razorpay keys (payments currently MOCKED test mode); set ADMIN_EMAIL.
 - P1: Phone OTP login, automatic payouts (Razorpay Route), email alerts, calendar date picker in offer dialog.

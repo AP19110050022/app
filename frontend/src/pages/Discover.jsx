@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { Users, Store, MapPin, ChevronDown, Loader2, SearchX, Clock, Plus, Search, Bookmark } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CreatorCard } from "@/components/CreatorCard";
-import { FilterSheet, EMPTY_FILTERS } from "@/components/FilterSheet";
+import { FilterSheet, EMPTY_FILTERS, RadiusChips, LOC_KEYS } from "@/components/FilterSheet";
+import { LocationPicker, locLabel } from "@/components/LocationPicker";
 import { Seg, Empty } from "@/components/AppBits";
-import { CATEGORIES, CITIES, PLAN_BY_ID } from "@/constants/options";
+import { CATEGORIES, PLAN_BY_ID } from "@/constants/options";
 import { useMe } from "@/context/MeContext";
 
 const Banner = ({ me, openPlus }) => {
@@ -33,18 +34,24 @@ const Banner = ({ me, openPlus }) => {
   );
 };
 
-const CityPill = ({ city, onChange }) => (
-  <Select value={city || "any"} onValueChange={(v) => onChange(v === "any" ? "" : v)}>
-    <SelectTrigger className="h-11 flex-1 rounded-full border-0 bg-white px-4 text-[14px] font-extrabold text-[#1F1B2E] [&>svg]:hidden" data-testid="city-select">
-      <div className="flex min-w-0 items-center gap-2"><MapPin className="h-4 w-4 shrink-0 text-[#6C4CF1]" /><span className="truncate">{city || "All cities"}</span><span className="shrink-0 text-[13px] font-semibold text-[#5B5675]">· Any distance</span></div>
-      <ChevronDown className="h-4 w-4 shrink-0 text-[#5B5675]" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="any">All cities</SelectItem>
-      {CITIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-    </SelectContent>
-  </Select>
-);
+export const pickToFilters = (l) => ({ city: l?.city || "", state: l?.state || "", lat: l?.lat ?? null, lng: l?.lng ?? null, radius_km: l?.city ? 50 : 0 });
+
+const LocationPill = ({ filters, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const dist = filters.city ? (filters.radius_km ? `+${filters.radius_km} km` : "Only here") : "Anywhere";
+  return (
+    <>
+      <button onClick={() => setOpen(true)} data-testid="location-pill" className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full bg-white px-4 text-left text-[14px] font-extrabold text-[#1F1B2E] transition-transform active:scale-[.98]">
+        <MapPin className="h-4 w-4 shrink-0 text-[#6C4CF1]" /><span className="truncate" data-testid="location-pill-label">{locLabel(filters)}</span>
+        <span className="shrink-0 text-[13px] font-semibold text-[#5B5675]">· {dist}</span>
+        <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-[#5B5675]" />
+      </button>
+      <LocationPicker open={open} onOpenChange={setOpen} onPick={(l) => onChange(pickToFilters(l))} />
+    </>
+  );
+};
+
+const locParams = (f) => Object.fromEntries(LOC_KEYS.map((k) => [k, f[k]]).filter(([, v]) => v));
 
 export const BusinessCard = ({ b, i, onOpen, saved, onToggleSave }) => (
   <div className="relative">
@@ -53,10 +60,10 @@ export const BusinessCard = ({ b, i, onOpen, saved, onToggleSave }) => (
     <span className="absolute -right-12 -top-12 h-[190px] w-[190px] rounded-full border-[26px] border-white/15" />
     <div className="relative flex items-center gap-3">
       <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white text-lg font-extrabold text-[#6C4CF1]">{b.logo ? <img src={b.logo} alt="" className="h-full w-full object-cover" /> : b.company[0]}</span>
-      <div className="min-w-0"><p className="truncate font-extrabold">{b.company}</p><p className="truncate text-xs text-white/80">{b.industry} · {b.city}</p></div>
+      <div className="min-w-0"><p className="truncate font-extrabold">{b.company}</p><p className="truncate text-xs text-white/80">{b.industry} · {b.city}{b.distance_km != null ? ` · ${b.distance_km} km` : ""}</p></div>
     </div>
     <div className="relative mt-3 flex flex-wrap gap-1.5">
-      <span className="inline-flex h-6 items-center rounded-full bg-white/20 px-2.5 text-[11px] font-bold">Needs: {PLAN_BY_ID[b.need_plan]?.label}</span>
+      <span className="inline-flex h-6 items-center rounded-full bg-white/20 px-2.5 text-[11px] font-bold">Needs: {(b.need_plans || [b.need_plan]).map((p) => PLAN_BY_ID[p]?.label).join(", ")}</span>
       <span className="inline-flex h-6 items-center rounded-full bg-white/20 px-2.5 text-[11px] font-bold">Budget {b.budget}</span>
     </div>
   </button>
@@ -68,13 +75,57 @@ export const BusinessCard = ({ b, i, onOpen, saved, onToggleSave }) => (
   </div>
 );
 
-const Businesses = ({ saved, onToggleSave }) => {
+export const JobCard = ({ j, i = 0, onInterest, mine }) => (
+  <div className="rise card-shadow relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#6C4CF1] to-[#3B25A8] p-4" style={{ animationDelay: `${i * 60}ms` }} data-testid={`job-card-${j.id}`}>
+    <span className="absolute -right-12 -top-12 h-[190px] w-[190px] rounded-full border-[26px] border-white/15" />
+    <Link to={`/app/business/${j.business_id}`} className="relative flex items-center gap-3" data-testid={`job-business-link-${j.id}`}>
+      <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white text-lg font-extrabold text-[#6C4CF1]">{j.logo ? <img src={j.logo} alt="" className="h-full w-full object-cover" /> : j.company[0]}</span>
+      <div className="min-w-0"><p className="truncate text-[13px] font-bold">{j.company}</p><p className="truncate text-xs text-white/80">{j.city}{j.distance_km != null ? ` · ${Math.round(j.distance_km)} km` : ""}</p></div>
+    </Link>
+    <p className="relative mt-3 text-lg font-extrabold leading-tight">{j.title}</p>
+    <p className="relative mt-1 line-clamp-2 text-[13px] text-white/85">{j.description}</p>
+    <div className="relative mt-3 flex flex-wrap gap-1.5">
+      {j.plans.map((p) => <span key={p} className="inline-flex h-6 items-center rounded-full bg-white/20 px-2.5 text-[11px] font-bold">{PLAN_BY_ID[p]?.label}</span>)}
+      <span className="inline-flex h-6 items-center rounded-full bg-white/20 px-2.5 text-[11px] font-bold">Budget {j.budget}</span>
+      {j.languages?.length > 0 && <span className="inline-flex h-6 items-center rounded-full bg-white/20 px-2.5 text-[11px] font-bold">{j.languages.slice(0, 2).join(", ")}</span>}
+    </div>
+    {!mine && onInterest && (
+      <button disabled={j.applied} onClick={() => onInterest(j)} data-testid={`job-interest-${j.id}`}
+        className="relative mt-4 h-11 w-full rounded-full bg-white text-sm font-extrabold text-[#3B25A8] transition-transform active:scale-[.98] disabled:opacity-70">
+        {j.applied ? "Interest sent" : "I'm interested"}
+      </button>
+    )}
+  </div>
+);
+
+const Jobs = ({ loc }) => {
+  const { api, me } = useMe();
+  const [list, setList] = useState(null);
+  const key = JSON.stringify(loc);
+  useEffect(() => { setList(null); api.get("/jobs", { params: JSON.parse(key) }).then((r) => setList(r.data)); }, [api, key]);
+  const interest = async (j) => {
+    if (!me.creator) return toast.error("Set up your creator profile first. Tap + to start.");
+    try { await api.post(`/jobs/${j.id}/interest`, { note: "" }); setList((l) => l.map((x) => (x.id === j.id ? { ...x, applied: true } : x))); toast.success(`Interest sent to ${j.company}`); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Couldn't send interest"); }
+  };
+  if (!list) return <div className="grid place-items-center py-16"><Loader2 className="h-7 w-7 animate-spin" /></div>;
+  if (!list.length) return <Empty icon={Store} title="No open jobs here yet" text="Businesses appear here when they post a job. Try a bigger distance or another location." testid="jobs-empty" />;
+  return (
+    <>
+      <p className="mb-3 text-xs text-white/75">{list.length} businesses are hiring. Tap I'm interested and they can send you an offer.</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="job-grid">{list.map((j, i) => <JobCard key={j.id} j={j} i={i} mine={j.business_id === me.user.user_id} onInterest={interest} />)}</div>
+    </>
+  );
+};
+
+const Businesses = ({ saved, onToggleSave, loc }) => {
   const { api } = useMe();
   const [list, setList] = useState(null);
   const [open, setOpen] = useState(null);
-  useEffect(() => { api.get("/businesses").then((r) => setList(r.data)); }, [api]);
+  const key = JSON.stringify(loc);
+  useEffect(() => { setList(null); api.get("/businesses", { params: JSON.parse(key) }).then((r) => setList(r.data)); }, [api, key]);
   if (!list) return <div className="grid place-items-center py-16"><Loader2 className="h-7 w-7 animate-spin" /></div>;
-  if (!list.length) return <Empty icon={Store} title="No businesses yet" text="Brands that join and set up a profile show up here." testid="businesses-empty" />;
+  if (!list.length) return <Empty icon={Store} title="No businesses here yet" text="Try a bigger distance or another location." testid="businesses-empty" />;
   return (
     <>
       <p className="mb-3 text-xs text-white/75">{list.length} businesses are looking for faces. Set up a creator profile so they can send you offers.</p>
@@ -100,15 +151,15 @@ export default function Discover({ search = false }) {
   const [tab, setTab] = useState("creators");
   const [q, setQ] = useState("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [sort, setSort] = useState("recommended");
+  const sort = filters.sort;
   const [list, setList] = useState(null);
   const [saved, setSaved] = useState([]);
 
   const load = useCallback(async () => {
-    const params = { sort, q, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) };
+    const params = { q, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) };
     const { data } = await api.get("/creators", { params });
     setList(data);
-  }, [api, filters, sort, q]);
+  }, [api, filters, q]);
 
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
   useEffect(() => { api.get("/saved/ids").then((r) => setSaved(r.data)); }, [api]);
@@ -129,13 +180,14 @@ export default function Discover({ search = false }) {
           <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, city or category" className="rounded-full border-[1.5px] border-white/30 bg-white/15 pl-11 font-semibold" data-testid="discover-search-input" />
         </div>
       )}
-      {!search && <Seg value={tab} onChange={setTab} options={[["creators", "Creators", Users], ["businesses", "Businesses", Store]]} testid="discover-tabs" />}
-      {tab === "businesses" && !search ? <div className="mt-4"><Businesses saved={saved} onToggleSave={(id) => toggleSave(id, "business")} /></div> : (
+      {!search && <Seg value={tab} onChange={setTab} options={[["creators", "Creators", Users], ["businesses", "Jobs by businesses", Store]]} testid="discover-tabs" />}
+      <div className="mt-2 flex gap-2">
+        {(tab === "creators" || search) && <FilterSheet filters={filters} onApply={setFilters} />}
+        <LocationPill filters={filters} onChange={(l) => setFilters((f) => ({ ...f, ...l }))} />
+      </div>
+      {filters.city && <div className="mt-2"><RadiusChips value={filters.radius_km} onChange={(radius_km) => setFilters((f) => ({ ...f, radius_km }))} testid="pill-radius" /></div>}
+      {tab === "businesses" && !search ? <div className="mt-4"><Jobs loc={locParams(filters)} /></div> : (
         <>
-          <div className="mt-2 flex gap-2">
-            <FilterSheet filters={filters} onApply={setFilters} />
-            <CityPill city={filters.city} onChange={(city) => setFilters((f) => ({ ...f, city }))} />
-          </div>
           <div className="no-scrollbar -mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4">
             {[{ id: "" }, ...CATEGORIES].map((c) => (
               <button key={c.id || "all"} onClick={() => setFilters((f) => ({ ...f, category: c.id }))} data-testid={`category-chip-${(c.id || "all").toLowerCase().replace(/ /g, "-")}`}
@@ -143,23 +195,11 @@ export default function Discover({ search = false }) {
                 {c.icon && <c.icon className="h-3.5 w-3.5" />}{c.id || "All"}
               </button>
             ))}
-            <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger className="h-9 w-auto shrink-0 gap-1 rounded-full border-0 bg-white/15 px-3.5 text-[13px] font-bold" data-testid="sort-select">
-                <span>{{ recommended: "Recommended", rating: "Top rated", price_asc: "Price ↑", price_desc: "Price ↓", newest: "Newest" }[sort]}</span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recommended">Recommended</SelectItem>
-                <SelectItem value="rating">Top rated</SelectItem>
-                <SelectItem value="price_asc">Price: low to high</SelectItem>
-                <SelectItem value="price_desc">Price: high to low</SelectItem>
-                <SelectItem value="newest">Newest</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-          {list && <p className="mt-3 text-xs text-white/75" data-testid="discover-count">{list.length} creators{filters.city ? ` in ${filters.city}` : ""}. Tap one to see prices and hire them. Profiles marked Sample are examples.</p>}
+          {list && <p className="mt-3 text-xs text-white/75" data-testid="discover-count">{list.length} creators{filters.city ? ` in and around ${filters.city}${filters.radius_km ? ` (${filters.radius_km} km)` : ""}` : filters.state ? ` in ${filters.state}` : " across India"}{sort !== "recommended" ? ` · ${{ nearest: "nearest first", price_asc: "price low to high", price_desc: "price high to low", rating: "top rated", newest: "newest" }[sort]}` : ""}. Profiles marked Sample are examples.</p>}
           {list === null ? <div className="grid place-items-center py-20"><Loader2 className="h-7 w-7 animate-spin" /></div>
             : list.length === 0 ? (
-              <div className="mt-4"><Empty icon={SearchX} title="No creators match" text="Try another city or clear your filters." testid="discover-empty"
+              <div className="mt-4"><Empty icon={SearchX} title="No creators match" text={filters.city ? "Try a bigger distance, or choose the whole state." : "Try another location or clear your filters."} testid="discover-empty"
                 action={<button className="mt-4 rounded-full bg-white px-5 py-2 text-sm font-bold text-[#3B25A8]" onClick={() => { setFilters(EMPTY_FILTERS); setQ(""); }}>Clear filters</button>} /></div>
             ) : (
               <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4" data-testid="creator-grid">

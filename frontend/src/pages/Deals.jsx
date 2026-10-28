@@ -58,6 +58,7 @@ export default function Deals() {
   return (
     <div data-testid="deals-page">
       <SubHeader title="My Deals" sub="Pending → Accepted → Paid → Delivered → Completed" />
+                <Link to="/app/jobs" className="glass mb-3 flex items-center justify-between rounded-[20px] px-4 py-3 text-sm font-bold" data-testid="deals-jobs-link"><span className="flex items-center gap-2"><Briefcase className="h-4 w-4" />{me.business ? "My jobs & interested creators" : "Jobs I'm interested in"}</span><ChevronRight className="h-4 w-4" /></Link>
       {both && <div className="mb-3"><Seg value={side} onChange={setSide} options={[["business", "Hiring"], ["creator", "Working"]]} testid="deals-side" /></div>}
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
         {[["all", "All"], ["open", "Open"], ["active", "In progress"], ["done", "Completed"], ["closed", "Closed"]].map(([k, l]) => (

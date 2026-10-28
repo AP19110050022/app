@@ -14,7 +14,7 @@ const Box = ({ children, testid }) => (
   <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[28px] border-white/10 bg-gradient-to-b from-[#4530C8] to-[#2A1B7A] text-white sm:max-w-lg" data-testid={testid}>{children}</DialogContent>
 );
 
-export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_video" }) => {
+export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_video", onSent }) => {
   const { me, api, config, refresh } = useMe();
   const navigate = useNavigate();
   const [plan, setPlan] = useState(initialPlan);
@@ -23,12 +23,14 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
   const [date, setDate] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const offered = PLANS.filter((p) => creator[p.rate]);
   useEffect(() => {
     if (open) {
-      setPlan(initialPlan);
-      setPrice(creator[PLANS.find((p) => p.id === initialPlan).rate]);
+      const start = offered.find((p) => p.id === initialPlan) || offered[0];
+      setPlan(start.id);
+      setPrice(creator[start.rate]);
     }
-  }, [open, initialPlan, creator]);
+  }, [open, initialPlan, creator]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (p) => { setPlan(p.id); setPrice(creator[p.rate]); };
   const limit = config?.free_offer_limit ?? 2;
@@ -41,6 +43,7 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
       const { data } = await api.post("/deals", { creator_id: creator.user_id, plan, brief, start_date: date, price: Number(price) });
       await refresh();
       toast.success("Offer sent!");
+      onSent?.();
       onOpenChange(false);
       navigate(`/app/chat/${data.id}`);
     } catch (err) {
@@ -70,8 +73,8 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
           <DialogDescription className="text-white/75">Pick a plan, describe what you need, and propose a price.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            {PLANS.map((p) => (
+          <div className={`grid gap-2 ${offered.length === 3 ? "grid-cols-3" : offered.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+            {offered.map((p) => (
               <button type="button" key={p.id} onClick={() => pick(p)} data-testid={`offer-plan-${p.id}`}
                 className={`rounded-[18px] border p-3 text-left transition-colors ${plan === p.id ? "border-white bg-white text-[#3B25A8]" : "border-white/25 bg-white/10 hover:bg-white/20"}`}>
                 <p.icon className="h-5 w-5" />

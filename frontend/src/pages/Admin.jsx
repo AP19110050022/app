@@ -62,7 +62,7 @@ export default function Admin() {
           {pending.length === 0 ? <Empty t="No profiles waiting for review" /> : pending.map((c) => (
             <Row key={c.user_id} testid={`admin-pending-${c.user_id}`}>
               <img src={c.photo} alt="" className="h-12 w-12 rounded-2xl object-cover" />
-              <div className="min-w-0 flex-1"><p className="font-semibold">{c.name}</p><p className="text-xs text-white/65">{c.category} · {c.city} · from {inr(c.rate_per_video)} · {c.intro_video ? <a href={c.intro_video} target="_blank" rel="noreferrer" className="underline">intro video</a> : "no intro video"}</p></div>
+              <div className="min-w-0 flex-1"><p className="font-semibold">{c.name}</p><p className="text-xs text-white/65">{c.category} · {c.city} · from {inr(c.from_price ?? c.rate_per_video)} · {c.intro_video ? <a href={c.intro_video} target="_blank" rel="noreferrer" className="underline">intro video</a> : "no intro video"}</p></div>
               <Button size="sm" className="gap-1 rounded-full" onClick={() => setStatus(c.user_id, "approved")} data-testid={`admin-approve-${c.user_id}`}><Check className="h-4 w-4" />Approve</Button>
               <Button size="sm" variant="outline" className="gap-1 rounded-full" onClick={() => setStatus(c.user_id, "hidden")} data-testid={`admin-hide-${c.user_id}`}><EyeOff className="h-4 w-4" />Reject</Button>
             </Row>

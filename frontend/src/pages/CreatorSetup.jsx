@@ -1,18 +1,19 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, X } from "lucide-react";
+import { PostsEditor } from "@/components/PostsEditor";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ChipSelect } from "@/components/ChipSelect";
 import { ImagePicker } from "@/components/ImagePicker";
 import { Field } from "@/components/Stepper";
 import { SetupFrame } from "@/components/SetupFrame";
-import { CATEGORIES, CITIES, LANGUAGES, GENDERS, PLANS } from "@/constants/options";
+import { CATEGORIES, LANGUAGES, GENDERS, PLANS } from "@/constants/options";
+import { LocationField } from "@/components/LocationPicker";
 import { useMe } from "@/context/MeContext";
 import { errMsg } from "@/lib/api";
 
-const BLANK = { name: "", photo: "", city: "", category: "", gender: "", languages: [], bio: "", intro_video: "", samples: [], instagram: "", youtube: "", followers: 0, phone: "", rate_per_video: "", rate_part_time: "", rate_full_time: "" };
+const BLANK = { name: "", photo: "", city: "", categories: [], gender: "", languages: [], bio: "", intro_video: "", samples: [], instagram: "", youtube: "", followers: 0, phone: "", rate_per_video: "", rate_part_time: "", rate_full_time: "" };
 const HINT = { per_video: "Most creators start between ₹500 and ₹3,000", part_time: "Usually 6–8× your per-video price", full_time: "Usually 15–20× your per-video price" };
 const TITLES = [["Tell brands who you are", "A clear face photo works best."], ["Show your work", "Links to your intro video, reels and socials. All optional."], ["Set your prices", "Brands see “from ₹…” on your card. 10% service fee on paid deals."]];
 
@@ -20,16 +21,19 @@ export default function CreatorSetup() {
   const { me, api, refresh } = useMe();
   const navigate = useNavigate();
   const editing = !!me.creator;
-  const [f, setF] = useState(() => ({ ...BLANK, name: me.user.name || "", photo: me.user.image_url || "", ...(me.creator || {}) }));
+  const [f, setF] = useState(() => ({ ...BLANK, name: me.user.name || "", ...(me.creator || {}), categories: me.creator?.categories || (me.creator?.category ? [me.creator.category] : []) }));
+  const [on, setOn] = useState(() => PLANS.filter((p) => !me.creator || me.creator[p.rate]).map((p) => p.id));
+  const togglePlan = (id) => setOn((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
   const [upi, setUpi] = useState(me.user.payout_upi || "");
-  const [step, setStep] = useState(0);
+  const [params] = useSearchParams();
+  const [step, setStep] = useState(() => Math.min(2, Number(params.get("step")) || 0));
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v?.target ? v.target.value : v }));
 
   const valid = [
-    f.name.trim().length >= 2 && f.photo && f.city && f.category && f.gender && f.languages.length,
+    f.name.trim().length >= 2 && f.photo && f.city && f.categories.length && f.gender && f.languages.length,
     true,
-    Number(f.rate_per_video) >= 100 && Number(f.rate_part_time) >= 500 && Number(f.rate_full_time) >= 500,
+    on.length > 0 && PLANS.every((p) => !on.includes(p.id) || Number(f[p.rate]) >= (p.id === "per_video" ? 100 : 500)),
   ];
 
   const save = async () => {
@@ -37,7 +41,7 @@ export default function CreatorSetup() {
     try {
       await api.put("/creators/me", {
         ...f, followers: Number(f.followers) || 0, samples: f.samples.filter(Boolean),
-        rate_per_video: Number(f.rate_per_video), rate_part_time: Number(f.rate_part_time), rate_full_time: Number(f.rate_full_time),
+        rate_per_video: on.includes("per_video") ? Number(f.rate_per_video) : null, rate_part_time: on.includes("part_time") ? Number(f.rate_part_time) : null, rate_full_time: on.includes("full_time") ? Number(f.rate_full_time) : null,
       });
       if (upi !== (me.user.payout_upi || "")) await api.patch("/me", { payout_upi: upi });
       await refresh();
@@ -52,13 +56,12 @@ export default function CreatorSetup() {
       cta={step < 2 ? "Continue" : editing ? "Save changes" : "Create creator profile"} onNext={() => (step < 2 ? setStep(step + 1) : save())}>
       {step === 0 && (
         <>
-          <ImagePicker value={f.photo} onChange={set("photo")} testid="creator-photo" label="Profile photo" />
+          <ImagePicker value={f.photo} onChange={set("photo")} testid="creator-photo" label="Profile photo (required)" />
           <Field label="Your name"><Input value={f.name} onChange={set("name")} data-testid="creator-name-input" /></Field>
-          <Field label="City">
-            <Input list="cities" value={f.city} onChange={set("city")} placeholder="Type or pick your city" data-testid="creator-city-input" />
-            <datalist id="cities">{CITIES.map((c) => <option key={c} value={c} />)}</datalist>
+          <Field label="City or town" hint="Businesses nearby will see you first.">
+            <LocationField value={f} onChange={(l) => setF((p) => ({ ...p, city: l.city, state: l.state, lat: l.lat, lng: l.lng }))} testid="creator-city-input" />
           </Field>
-          <Field label="What do you present?"><ChipSelect tiles options={CATEGORIES} value={f.category} onChange={set("category")} testid="creator-category" /></Field>
+          <Field label="What do you present? (pick up to 4)"><ChipSelect tiles multi max={4} options={CATEGORIES} value={f.categories} onChange={set("categories")} testid="creator-category" /></Field>
           <Field label="Languages"><ChipSelect multi options={LANGUAGES} value={f.languages} onChange={set("languages")} testid="creator-languages" /></Field>
           <Field label="Gender"><ChipSelect options={GENDERS} value={f.gender} onChange={set("gender")} testid="creator-gender" /></Field>
         </>
@@ -67,16 +70,8 @@ export default function CreatorSetup() {
         <>
           <Field label="Short bio"><Textarea rows={3} maxLength={500} value={f.bio} onChange={set("bio")} placeholder="What makes you a great face for brands?" data-testid="creator-bio-input" /></Field>
           <Field label="Intro video link" hint="30–60s of you on camera (YouTube, Instagram or Drive)"><Input value={f.intro_video} onChange={set("intro_video")} placeholder="https://…" data-testid="creator-intro-input" /></Field>
-          <Field label={`Work samples (${f.samples.length}/6)`}>
-            <div className="space-y-2">
-              {f.samples.map((s, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input value={s} onChange={(e) => set("samples")(f.samples.map((x, j) => (j === i ? e.target.value : x)))} placeholder="https://…" data-testid={`creator-sample-input-${i}`} />
-                  <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/15" onClick={() => set("samples")(f.samples.filter((_, j) => j !== i))} data-testid={`creator-sample-remove-${i}`}><X className="h-4 w-4" /></button>
-                </div>
-              ))}
-              {f.samples.length < 6 && <button type="button" className="glass flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold" onClick={() => set("samples")([...f.samples, ""])} data-testid="creator-sample-add"><Plus className="h-4 w-4" />Add sample link</button>}
-            </div>
+          <Field label={`Photos & work samples (${f.samples.length}/12)`} hint="Upload photos or add links to your reels. They show as posts on your profile.">
+            <PostsEditor value={f.samples} onChange={set("samples")} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Instagram"><Input value={f.instagram} onChange={set("instagram")} placeholder="@yourname" data-testid="creator-instagram-input" /></Field>
@@ -88,19 +83,25 @@ export default function CreatorSetup() {
       )}
       {step === 2 && (
         <>
-          {PLANS.map((p) => (
-            <div key={p.id} className="glass rounded-[22px] p-4">
-              <div className="flex items-center gap-3">
+          <p className="text-[13px] text-white/75">Turn on the plans you offer. You can offer one, two or all three.</p>
+          {PLANS.map((p) => {
+            const active = on.includes(p.id);
+            return (
+            <div key={p.id} className={`rounded-[22px] p-4 transition-colors ${active ? "glass" : "glass-soft opacity-70"}`}>
+              <button type="button" onClick={() => togglePlan(p.id)} className="flex w-full items-center gap-3 text-left" data-testid={`creator-plan-toggle-${p.id}`}>
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-white/50"><p.icon className="h-5 w-5" /></span>
                 <div className="min-w-0 flex-1"><p className="font-extrabold">{p.label}</p><p className="text-xs text-white/70">{p.bullets[0]} · {p.bullets[1]}</p></div>
-              </div>
-              <div className="relative mt-3">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-white/70">₹</span>
-                <Input type="number" min={100} className="pl-8 font-bold" value={f[p.rate]} onChange={set(p.rate)} placeholder={`Price ${p.unit}`} data-testid={`creator-rate-${p.id}`} />
-              </div>
-              <p className="mt-1.5 text-xs text-white/60">{HINT[p.id]}</p>
+                <span className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${active ? "bg-[#5CE0A0]" : "bg-white/25"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-[left] ${active ? "left-6" : "left-1"}`} /></span>
+              </button>
+              {active && (<>
+                <div className="relative mt-3">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-white/70">₹</span>
+                  <Input type="number" min={100} className="pl-8 font-bold" value={f[p.rate] || ""} onChange={set(p.rate)} placeholder={`Price ${p.unit}`} data-testid={`creator-rate-${p.id}`} />
+                </div>
+                <p className="mt-1.5 text-xs text-white/60">{HINT[p.id]}</p>
+              </>)}
             </div>
-          ))}
+          ); })}
           <Field label="Payout UPI ID" hint="Where your earnings are sent. You can change it later."><Input value={upi} onChange={(e) => setUpi(e.target.value)} placeholder="name@upi" data-testid="creator-upi-input" /></Field>
           {!editing && <p className="text-xs text-white/60">Your profile goes live after a quick review by our team.</p>}
         </>

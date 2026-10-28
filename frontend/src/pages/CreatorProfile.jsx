@@ -28,7 +28,7 @@ const Posts = ({ c }) => {
 
 const Prices = ({ c, own, onHire }) => (
   <div className="space-y-3 px-4 py-4">
-    {PLANS.map((p, i) => (
+    {PLANS.filter((p) => c[p.rate]).map((p, i) => (
       <div key={p.id} className={`rounded-[22px] p-4 ${i === 0 ? "bg-white text-[#1F1B2E]" : "glass"}`} data-testid={`creator-plan-${p.id}`}>
         <div className="flex items-start gap-3">
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 ${i === 0 ? "border-[#6C4CF1] text-[#6C4CF1]" : "border-white/50"}`}><p.icon className="h-5 w-5" /></span>
@@ -90,7 +90,7 @@ export default function CreatorProfile() {
   const message = async () => {
     const { data } = await api.get("/deals", { params: { side: "business" } });
     const d = data.find((x) => x.creator_id === id && !["declined", "cancelled"].includes(x.status));
-    d ? navigate(`/app/chat/${d.id}`) : setOfferPlan("per_video");
+    d ? navigate(`/app/chat/${d.id}`) : setOfferPlan(c.plans?.[0] || "per_video");
   };
 
   return (
@@ -111,11 +111,11 @@ export default function CreatorProfile() {
           </div>
         </div>
         <p className="mt-3 flex items-center gap-2 text-[17px] font-extrabold" data-testid="creator-name">{c.name}<span className="h-2 w-2 rounded-full bg-[#5CE0A0]" />{c.is_sample && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-extrabold uppercase">Sample</span>}</p>
-        <p className="text-[14px] text-white/80">{c.category} presenter{c.followers ? ` · ${c.followers >= 1000 ? `${Math.round(c.followers / 1000)}k` : c.followers} followers` : ""}</p>
+        <p className="text-[14px] text-white/80">{(c.categories || [c.category]).join(" · ")} presenter{c.followers ? ` · ${c.followers >= 1000 ? `${Math.round(c.followers / 1000)}k` : c.followers} followers` : ""}</p>
         {c.bio && <p className="mt-1 line-clamp-2 text-[14px]">{c.bio}</p>}
         <p className="text-[14px] text-white/70">{c.city} · {c.languages.join(", ")}</p>
         <div className="no-scrollbar mt-4 flex gap-4 overflow-x-auto pb-1">
-          {PLANS.map((p) => (
+          {PLANS.filter((p) => c[p.rate]).map((p) => (
             <button key={p.id} onClick={() => (own ? setTab("prices") : setOfferPlan(p.id))} className="flex shrink-0 flex-col items-center gap-1.5" data-testid={`highlight-${p.id}`}>
               <span className="grid h-[62px] w-[62px] place-items-center rounded-full border-2 border-white/60 bg-white/10 transition-transform hover:scale-105"><p.icon className="h-6 w-6" /></span>
               <span className="text-xs font-bold">{p.label}</span>
@@ -137,7 +137,7 @@ export default function CreatorProfile() {
       {!own && (
         <div className="fixed inset-x-0 bottom-[88px] z-30 mx-auto flex max-w-md gap-2.5 px-4">
           <button onClick={message} className="glass flex h-[52px] flex-1 items-center justify-center gap-2 rounded-full bg-[#2A1B7A]/70 font-bold" data-testid="profile-message-button"><MessageSquare className="h-5 w-5" />Message</button>
-          <button onClick={() => setOfferPlan("per_video")} className="cta h-[52px] flex-[1.4] truncate rounded-full px-4 font-extrabold" data-testid="sticky-send-offer">Hire {c.name.split(" ")[0]}</button>
+          <button onClick={() => setOfferPlan(c.plans?.[0] || "per_video")} className="cta h-[52px] flex-[1.4] truncate rounded-full px-4 font-extrabold" data-testid="sticky-send-offer">Hire {c.name.split(" ")[0]}</button>
         </div>
       )}
       {offerPlan && <OfferDialog creator={c} open={!!offerPlan} initialPlan={offerPlan} onOpenChange={(o) => !o && setOfferPlan(null)} />}

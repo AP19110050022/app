@@ -20,6 +20,13 @@ export const Seg = ({ value, onChange, options, testid }) => (
   </div>
 );
 
+export const Switch = ({ on, onClick, testid, label }) => (
+  <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onClick} data-testid={testid}
+    className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${on ? "bg-[#5CE0A0]" : "bg-white/25"}`}>
+    <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-[left] ${on ? "left-7" : "left-1"}`} />
+  </button>
+);
+
 export const Empty = ({ icon: Icon, title, text, action, testid }) => (
   <div className="glass-soft flex flex-col items-center rounded-[26px] px-6 py-14 text-center" data-testid={testid}>
     <span className="grid h-16 w-16 place-items-center rounded-full bg-white/15"><Icon className="h-7 w-7" /></span>
