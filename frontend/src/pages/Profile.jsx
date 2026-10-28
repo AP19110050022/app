@@ -18,13 +18,13 @@ export const Panel = ({ title, children, testid }) => (
   </section>
 );
 
-export const VisibilityCard = ({ kind, live, onToggle }) => (
+export const VisibilityCard = ({ kind, live, onToggle, pending }) => (
   <section className={`rounded-[24px] p-4 ${live ? "bg-gradient-to-br from-[#14B8A6]/40 to-[#6C4CF1]/40 ring-1 ring-[#5CE0A0]/50" : "glass"}`} data-testid={`visibility-${kind}`}>
     <div className="flex items-center gap-3">
       <div className="min-w-0 flex-1">
         <p className="text-[10px] font-extrabold tracking-widest text-white/70">{kind === "creator" ? "CREATOR" : "BUSINESS"} VISIBILITY</p>
-        <p className="mt-0.5 flex items-center gap-2 text-lg font-extrabold"><span className={`h-2.5 w-2.5 rounded-full ${live ? "bg-[#5CE0A0] shadow-[0_0_8px_#5CE0A0]" : "bg-white/40"}`} />{live ? "You're live" : "You're offline"}</p>
-        <p className="text-[13px] text-white/75">{kind === "creator" ? (live ? "Businesses can find you and send offers." : "Hidden from Discover. Existing deals continue.") : (live ? "Your open jobs are visible to creators." : "Your jobs are hidden from creators.")}</p>
+        <p className="mt-0.5 flex items-center gap-2 text-lg font-extrabold"><span className={`h-2.5 w-2.5 rounded-full ${live ? "bg-[#5CE0A0] shadow-[0_0_8px_#5CE0A0]" : "bg-white/40"}`} />{live ? (pending ? "Live after approval" : "You're live") : "You're offline"}</p>
+        <p className="text-[13px] text-white/75">{pending && live ? "Your profile is under review. Once approved, businesses can find you." : kind === "creator" ? (live ? "Businesses can find you and send offers." : "Hidden from Discover. Existing deals continue.") : (live ? "Your open jobs are visible to creators." : "Your jobs are hidden from creators.")}</p>
       </div>
       <Switch on={live} onClick={onToggle} testid={`visibility-toggle-${kind}`} label={live ? "Go offline" : "Go live"} />
     </div>
@@ -60,7 +60,7 @@ export default function Profile() {
   }
   const status = isC && STATUS[p.status];
   const StatusIcon = status ? status[0] : null;
-  const posts = (p.samples?.length || 0) + 1;
+  const posts = p.samples?.length || 0;
 
   return (
     <div className="mx-auto max-w-xl space-y-4" data-testid="profile-page">
@@ -87,11 +87,11 @@ export default function Profile() {
         </div>
         {status && p.status !== "approved" && <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-200" data-testid="creator-status-pill"><StatusIcon className="h-3.5 w-3.5" />{status[1]}. Your profile shows in Discover once approved.</p>}
       </section>
-      <VisibilityCard kind={mode} live={p.live !== false} onToggle={() => toggle(mode, p.live === false)} />
+      <VisibilityCard kind={mode} live={p.live !== false} pending={isC && p.status !== "approved"} onToggle={() => toggle(mode, p.live === false)} />
       {isC ? (
         <Panel title="Creator tools" testid="creator-tools">
           <ToolRow to="/app/setup/creator?step=2" icon={Tag} title="Services & prices" sub={(p.plans || []).map((x) => PLAN_BY_ID[x]?.label).join(" · ")} testid="tool-services" />
-          <ToolRow to="/app/posts" icon={Camera} title="Portfolio posts" sub={`${posts - 1} posts · add or manage your photos and reels`} testid="tool-posts" />
+          <ToolRow to="/app/posts" icon={Camera} title="Portfolio posts" sub={`${posts} posts · add or manage your photos and reels`} testid="tool-posts" />
           <ToolRow to="/app/setup/creator" icon={MapPin} title="Work location" sub={`${p.city}${p.state ? `, ${p.state}` : ""}`} testid="tool-location" />
           <ToolRow to="/app/jobs" icon={Briefcase} title="Jobs I'm interested in" sub="Jobs posted by businesses" testid="tool-interests" />
           <ToolRow to="/app/settings#payments" icon={Wallet} title="Payout details" sub={me.user.payout_upi || "Add your UPI ID"} testid="tool-payout" />

@@ -9,7 +9,8 @@ export const CreatorCard = ({ c, saved, onToggleSave, to, index = 0 }) => (
       <img src={c.photo} alt={c.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,5,40,.28)_0%,rgba(10,5,40,0)_26%,rgba(10,5,40,0)_42%,rgba(10,5,40,.92)_100%)]" />
       <div className="absolute left-2.5 right-12 top-2.5 flex flex-wrap gap-1">
-        {(c.plans || []).map((p) => <span key={p} className="flex h-[22px] items-center rounded-full bg-[rgba(10,5,40,.5)] px-2.5 text-[10.5px] font-bold backdrop-blur" data-testid={`card-plan-${p}`}>{PLAN_BY_ID[p]?.label}</span>)}
+        {(c.plans || []).slice(0, 1).map((p) => <span key={p} className="flex h-[22px] items-center rounded-full bg-[rgba(10,5,40,.5)] px-2.5 text-[10.5px] font-bold backdrop-blur" data-testid={`card-plan-${p}`}>{PLAN_BY_ID[p]?.label}</span>)}
+        {(c.plans || []).length > 1 && <span className="flex h-[22px] items-center rounded-full bg-[rgba(10,5,40,.5)] px-2 text-[10.5px] font-bold backdrop-blur" data-testid="card-plan-more">+{c.plans.length - 1}</span>}
         {c.is_sample && <span className="flex h-[22px] items-center rounded-full bg-[rgba(10,5,40,.5)] px-2.5 text-[10.5px] font-bold backdrop-blur">Sample</span>}
       </div>
       <div className="absolute inset-x-3 bottom-3">

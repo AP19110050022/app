@@ -76,14 +76,14 @@ class TestAuth:
 class TestProfiles:
     def test_business_profile(self, tok):
         body = {"company": "TEST_Chai Point Cafe", "industry": "Restaurant & cafe", "city": "Bengaluru",
-                "need_plan": "per_video", "budget": "₹5k–20k", "languages": ["Hindi"], "phone": "9999999999"}
+                "need_plans": ["per_video"], "budget": "₹5k–20k", "languages": ["Hindi"], "phone": "9999999999"}
         r = requests.put(f"{API}/businesses/me", json=body, headers=H(tok["brand"]))
         assert r.status_code == 200 and r.json()["company"] == "TEST_Chai Point Cafe"
         assert requests.get(f"{API}/me", headers=H(tok["brand"])).json()["business"]["city"] == "Bengaluru"
 
     def test_creator_profile_pending(self, tok):
         body = {"name": "TEST_Creator Tester", "photo": "https://images.unsplash.com/photo-1", "city": "Mumbai",
-                "category": "Food", "gender": "Female", "languages": ["Hindi", "English"], "bio": "hi",
+                "categories": ["Food"], "gender": "Female", "languages": ["Hindi", "English"], "bio": "hi",
                 "phone": "9876543210", "rate_per_video": 1500, "rate_part_time": 15000, "rate_full_time": 40000}
         r = requests.put(f"{API}/creators/me", json=body, headers=H(tok["creator"]))
         assert r.status_code == 200 and r.json()["status"] == "pending"

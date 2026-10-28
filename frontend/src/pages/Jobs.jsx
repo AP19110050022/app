@@ -64,9 +64,10 @@ const BusinessJobs = () => {
   const [offer, setOffer] = useState(null);
   const load = useCallback(() => api.get("/jobs/mine").then((r) => setJobs(r.data)), [api]);
   useEffect(() => { load(); }, [load]);
-  const st = async (j, status) => { await api.put(`/jobs/${j.id}`, { ...j, status }); toast.success(`Job ${status}`); load(); };
-  const del = async (j) => { await api.delete(`/jobs/${j.id}`); toast.success("Job deleted"); load(); };
-  const istat = async (i, status) => { await api.patch(`/interests/${i.id}`, { status }); load(); };
+  const safe = async (fn, ok) => { try { await fn(); if (ok) toast.success(ok); load(); } catch (e) { toast.error(errMsg(e)); } };
+  const st = (j, status) => safe(() => api.put(`/jobs/${j.id}`, { ...j, status }), `Job ${status}`);
+  const del = (j) => safe(() => api.delete(`/jobs/${j.id}`), "Job deleted");
+  const istat = (i, status) => safe(() => api.patch(`/interests/${i.id}`, { status }));
   const openOffer = async (i) => {
     try { const { data } = await api.get(`/creators/${i.creator_id}`); setOffer({ c: data, i }); } catch { toast.error("This creator isn't available right now"); }
   };

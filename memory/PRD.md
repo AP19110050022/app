@@ -24,6 +24,9 @@ One account, + chooser (creator 3 steps / business 2 steps); 3 plans Per Video /
 - Location (OLX-style): 6,413 Indian cities/towns (GeoNames ≥5k pop, incl. tier 2/3) in backend/data/in_cities.json; picker with All India / state / city / GPS; distance chips (only city, 10–250 km); 2dsphere geo search, "X km" on cards, nearest-first; used for creators, businesses and setup forms.
 - Razorpay keys requested via secure card (real payments turn on once added).
 
+- Iteration 3 (zip parity): plans shown on tiles; Sort (not price band) in filters; multi-category creators; creators offer 1–3 plans; photo uploads as posts (/app/posts, max 12); zip-style Profile (hero, metrics, Live/Offline for creator & business, tools rows); Settings page (notification prefs, payouts, privacy, help, terms, logout/delete); businesses multi-plan + description; Jobs: businesses post jobs, only open jobs of live businesses show in Discover "Jobs by businesses"; creators "I'm interested"; business manages interests (shortlist/decline/send offer); business public profile. Offline creators can't get new offers. iteration_2: backend 47/47, frontend all flows passed.
+- Razorpay: user skipped keys → payments still MOCKED test mode.
+
 ## Backlog
 - P0: Add Razorpay keys (payments currently MOCKED test mode); set ADMIN_EMAIL.
 - P1: Phone OTP login, automatic payouts (Razorpay Route), email alerts, calendar date picker in offer dialog.

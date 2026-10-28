@@ -196,10 +196,16 @@ class PostsIn(BaseModel):
     posts: List[str] = Field(max_length=12)
 
 
+class NotifyPrefs(BaseModel):
+    offers: bool = True
+    deals: bool = True
+    messages: bool = True
+
+
 class MeUpdate(BaseModel):
     active_mode: Optional[Literal["creator", "business"]] = None
     payout_upi: Optional[str] = Field(None, max_length=80)
-    notify_prefs: Optional[dict] = None
+    notify_prefs: Optional[NotifyPrefs] = None
 
 
 class OfferIn(BaseModel):
@@ -461,6 +467,8 @@ async def delete_me(member: dict = Depends(current_member)):
     uid = member["user_id"]
     for col in ("creators", "businesses", "saved", "notifications"):
         await db[col].delete_many({"user_id": uid})
+    await db.jobs.delete_many({"business_id": uid})
+    await db.interests.delete_many({"$or": [{"business_id": uid}, {"creator_id": uid}]})
     await db.users.delete_one({"user_id": uid})
     return {"ok": True}
 
@@ -577,11 +585,12 @@ async def list_jobs(state: str = "", city: str = "", lat: Optional[float] = None
 
 
 @api.get("/businesses/{biz_id}")
-async def business_profile(biz_id: str, _: dict = Depends(current_member)):
+async def business_profile(biz_id: str, member: dict = Depends(current_member)):
     b = await db.businesses.find_one({"user_id": biz_id}, {"_id": 0, "phone": 0, "loc": 0})
     if not b:
         raise HTTPException(404, "Business not found")
-    jobs = await db.jobs.find({"business_id": biz_id, "status": "open"}, JOB_PUBLIC).sort("created_at", -1).to_list(50)
+    hidden = b.get("live") is False and biz_id != member["user_id"]
+    jobs = [] if hidden else await db.jobs.find({"business_id": biz_id, "status": "open"}, JOB_PUBLIC).sort("created_at", -1).to_list(50)
     return {**b, "jobs": jobs}
 
 
@@ -595,6 +604,8 @@ async def show_interest(job_id: str, body: InterestIn, member: dict = Depends(cu
         raise HTTPException(404, "This job is no longer open")
     if job["business_id"] == member["user_id"]:
         raise HTTPException(400, "This is your own job")
+    if not await db.businesses.find_one({"user_id": job["business_id"], "live": {"$ne": False}}):
+        raise HTTPException(404, "This job is no longer open")
     doc = {"id": new_id(), "job_id": job_id, "job_title": job["title"], "business_id": job["business_id"], "company": job["company"],
            "creator_id": c["user_id"], "creator_name": c["name"], "creator_photo": c["photo"], "from_price": c.get("from_price"),
            "note": body.note, "status": "sent", "created_at": iso()}
@@ -672,6 +683,8 @@ async def create_deal(body: OfferIn, member: dict = Depends(current_member)):
         raise HTTPException(404, "Creator not found")
     if body.creator_id == uid:
         raise HTTPException(400, "You can't send an offer to yourself")
+    if creator.get("live") is False:
+        raise HTTPException(400, f"{creator['name']} is offline right now and isn't taking new offers")
     if not creator.get(RATE_FIELD[body.plan]):
         raise HTTPException(400, f"{creator['name']} doesn't offer the {PLAN_LABEL[body.plan]} plan")
     if not is_pro(member):

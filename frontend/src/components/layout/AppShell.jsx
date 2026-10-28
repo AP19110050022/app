@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink, Outlet, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
 import { Compass, Plus, Briefcase, MessageCircle, User, Bell, Search, Loader2, Bookmark } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { RoleChooser } from "@/components/RoleChooser";
@@ -61,6 +61,8 @@ const BottomNav = ({ onPlus }) => (
 export default function AppShell() {
   const { me, error } = useMe();
   const [plus, setPlus] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   if (!me) {
     return (
       <div className="grid min-h-screen place-items-center text-white" data-testid="app-loading">

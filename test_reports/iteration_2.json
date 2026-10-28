@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 2 tested the new creator, business, jobs and settings features at 390x844 mobile size. BACKEND: 47/47 pytest checks pass. That is the 26 regression checks (I updated the payloads to the new categories and need_plans schema) plus 21 new checks in test_iter2_features.py: Part-time-only creator gets plans, from_plan and from_price; a profile with no plans returns 400; 5 categories return 422; an offer for a plan the creator doesn't offer returns 400; filtering by any of a creator's categories works; price_asc and price_desc order correctly; nearest sorts by distance; an offline creator is hidden from GET /creators; posts save (13 posts return 422); notify_prefs.messages=false stops message notifications; business need_plans with several plans plus description saves, and empty plans return 422; jobs create, validate and need auth (401); creator interest is idempotent (interested=1) and sets applied=true; you can't show interest in your own job; jobs/mine lists interests; shortlist and offered are owner-only; the business profile lists open jobs without the phone; an offline business's jobs leave GET /jobs; paused and closed jobs are hidden and refuse interest; delete removes the job's interests. FRONTEND (Playwright, Clerk tickets): the account hero for creator and business, both visibility toggles (checked against /api/creators), tool rows (tool-services goes to setup step 3), plan toggles (zero plans and a price under the minimum disable submit; saving adds Per Video), a fresh creator setup from scratch (photo required, max 4 categories, Pune picked in the location picker, upload plus link post on step 2, Part-time only gives plans=['part_time'], status pending), Posts page (upload 2, add link, delete, save; shows on the public Posts tab), Discover card plan tags and '/ video' price pill, filter sheet (no slider; Nearest only shows after a city is picked; high-to-low and low-to-high order correctly; radius works), business needs saved, the whole jobs flow (post job, creator sees job-card in the 'Jobs by businesses' tab, 'Interest sent', business profile shows the open job, creator's interests list, business sends an offer from the interest and OfferDialog shows only Per Video and Part-time, interest becomes 'Offered', pause/publish/close hide and show the job), Settings (pref toggles persist across reload, UPI save, privacy toggle, logout lands on '/'), switching account, and the full UI deal regression (accept, test pay 'Paid · held', submit work, delivered, admin release, 'Completed'). All requested flows work. Only minor issues remain: offline profiles can still be reached by direct link, price sort mixes units, and small UI points.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/creators/{id} + POST /api/deals", "issue": "Neither checks creators.live. A creator who goes Offline can still be opened by direct link, Saved or Landing, and still gets NEW offers. Confirmed: an offline creator returned 200 and POST /deals returned 200. The UI copy says 'Hidden from Discover. Existing deals continue', which suggests new offers should be blocked (or at least warn the business)."},
+      {"endpoint": "GET /api/businesses/{id} + POST /api/jobs/{id}/interest", "issue": "Neither checks businesses.live. An offline business's open jobs still show on its public profile and can still get interest by direct job id. Only GET /jobs filters them out."},
+      {"endpoint": "GET /api/creators?sort=price_asc|price_desc", "issue": "Without a plan filter, it sorts by from_price, which mixes units. A Part-time-only creator at ₹15,000/month sorts after per-video creators at ₹999/video and looks 'most expensive'. Consider sorting by rate_per_video first, or showing the unit in the sort label."},
+      {"endpoint": "PATCH /api/me notify_prefs", "issue": "Takes any dict with no schema. {'x':'y'} was accepted and stored. Use a Pydantic model with offers, deals and messages as booleans."},
+      {"endpoint": "PATCH /api/interests/{id} status=offered", "issue": "Can be set without any deal. It isn't linked to a deal_id, so 'Offered' can be shown when the offer actually failed (for example a 402 free limit, if onSent is ever called wrongly)."},
+      {"endpoint": "DELETE /api/me", "issue": "Still leaves jobs, interests, deals, messages and payments behind (carried over from iteration 1; jobs and interests are new orphans)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Profile hero metrics", "issue": "The 'Posts' count is samples.length + 1 (it showed 3) while the Portfolio posts row says '2 posts'. Inconsistent.", "selector": "[data-testid='account-hero']", "priority": "LOW"},
+      {"component": "Jobs.jsx BusinessJobs st/del/istat", "issue": "No try/catch, so an API failure on pause/close/delete/shortlist/decline fails silently with no error toast.", "selector": "[data-testid^='job-pause-'], [data-testid^='interest-decline-']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Discover creator tiles (mobile 2-column)", "issues": ["Up to 4 plan and Sample tags stack vertically in the top-left and cover a large part of the face photo. Use one row of compact chips or a '+2' overflow."]},
+      {"screen": "Creator setup step 1 categories", "issues": ["The 5th category tap is silently ignored. Show a hint or disable unselected tiles at 4/4."]},
+      {"screen": "Profile (pending creator)", "issues": ["The visibility card says 'You're live · Businesses can find you' while the profile is still under review. Misleading."]},
+      {"screen": "Setup -> Profile navigation", "issues": ["Scroll position isn't reset after saving the setup, so Profile opens scrolled to the bottom."]},
+      {"screen": "OfferDialog", "issues": ["Still uses the native <input type=date> (from iteration 1) instead of the shadcn Calendar."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_hiremyface_api.py", "/app/backend/tests/test_iter2_features.py", "/app/backend/tests/clerk_helper.py", "/app/test_reports/pytest/pytest_iter2.xml"],
+  "action_items": [
+    "Decide what Offline means for direct links: block or warn on POST /deals to an offline creator, and filter offline businesses' jobs in GET /businesses/{id} and POST /jobs/{id}/interest.",
+    "Price sort: avoid mixing per-video and monthly from_price, or label it clearly.",
+    "Validate notify_prefs with a Pydantic model.",
+    "Fix the Profile Posts metric (+1), add try/catch and toasts to the job and interest actions in Jobs.jsx, and limit the stacked tags on Discover tiles.",
+    "Optional: give feedback at the 4-category limit, adjust the pending-creator visibility copy, reset scroll on route change, and use a shadcn Calendar in OfferDialog."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 991 lines (more than 700). Split it into routers: profiles, jobs, deals, payments, admin.",
+    "list_jobs loads every live business user_id into an $in list on each request, which won't scale. Store a denormalised live flag on jobs (update it in /me/visibility) or use $lookup.",
+    "with_plans and the rate mins are enforced correctly on the backend. Plan validation on deals is correct. Payment verify is now atomic (find_one_and_update on status 'accepted' plus a guard on payments.status). I re-checked the iteration 1 HIGH issue and it is resolved.",
+    "The interest doc snapshots creator_name, photo and from_price at interest time, so they go stale if the creator edits their profile."
+  ],
+  "updated_files": ["/app/backend/tests/test_hiremyface_api.py (payloads updated to categories and need_plans)", "/app/backend/tests/test_iter2_features.py (new)"],
+  "success_rate": {"backend": "100% (47/47)", "frontend": "100% of requested flows passed (minor UX issues only)"},
+  "test_credentials": "Used the admin, brand and creator +clerk_test users from /app/memory/test_credentials.md (Clerk tickets and session JWTs). All 3 users kept.",
+  "seed_data_creation": "Everything I created was deleted at the end: the TEST creator profiles (creator user plus a temporary one on brand), the TEST business, jobs, interests, deals, messages, payments and notifications for the 3 test users. The users were reset to active_mode=None, pro_until=None and an empty payout_upi. The 8 sample creators and 3 Clerk users remain. Note: the 3 test users now have NO creator or business profile.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run serially: cd /app/backend && python -m pytest tests/test_hiremyface_api.py tests/test_iter2_features.py -n 0. Order matters, because iter2 depends on the regression suite creating the approved TEST creator and the Pro TEST business. Mint a new ticket for every browser run (python tests/clerk_helper.py ticket <who>); every browser_automation call starts a fresh session. In LocationPicker, use press_sequentially on [data-testid=location-search-input] after an 800ms wait (fill right after opening gets reset), then click location-city-<slug>. ChipSelect testids are slugs: job-plans-part-time, job-budget--5k-20k, filter-sort-price-high-to-low, creator-category-real-estate. The Settings Terms section is settings-legal."
+}
