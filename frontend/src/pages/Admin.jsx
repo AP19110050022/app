@@ -100,7 +100,7 @@ export default function Admin() {
         <TabsContent value="users" className="mt-4"><Box>
           {d.users.users.map((u) => (
             <Row key={u.user_id} testid={`admin-user-${u.user_id}`}>
-              <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{u.name}{u.is_pro && <Crown className="ml-1 inline h-3.5 w-3.5 text-amber-500" />}</p><p className="truncate text-xs text-white/65">{u.email} · {u.active_mode || "no role yet"}</p></div>
+              <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{u.name}{u.is_pro && <Crown className="ml-1 inline h-3.5 w-3.5 text-amber-500" />}</p><p className="truncate text-xs text-white/65">{u.email} · {u.active_mode ? `${u.active_mode} mode` : "no profile yet"}</p></div>
               <Select value={u.role} onValueChange={(r) => setRole(u.user_id, r)}>
                 <SelectTrigger className="h-9 w-32 rounded-full" data-testid={`admin-role-select-${u.user_id}`}><SelectValue /></SelectTrigger>
                 <SelectContent>{d.users.roles.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>

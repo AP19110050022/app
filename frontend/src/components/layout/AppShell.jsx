@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
-import { Compass, Plus, Briefcase, MessageCircle, User, Bell, Search, Loader2 } from "lucide-react";
+import { Compass, Plus, Briefcase, MessageCircle, User, Bell, Search, Loader2, Bookmark } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { RoleChooser } from "@/components/RoleChooser";
 import { useMe } from "@/context/MeContext";
@@ -31,7 +31,7 @@ export const TopBar = ({ me }) => (
       </div>
       <div className="flex items-center gap-2">
         <IconBtn to="/app/search" icon={Search} testid="top-search-link" label="Search" />
-        <IconBtn to="/app/chat" icon={MessageCircle} testid="top-chat-link" label="Chat" />
+        <IconBtn to="/app/saved" icon={Bookmark} testid="top-saved-link" label="Saved" />
         <IconBtn to="/app/notifications" icon={Bell} badge={me?.unread_notifications} testid="top-notifications-link" label="Notifications" />
       </div>
     </div>

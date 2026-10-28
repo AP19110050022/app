@@ -214,8 +214,15 @@ CONTACT_RE = re.compile(
     re.IGNORECASE)
 
 
+def _mask_one(m: re.Match) -> str:
+    s = m.group(0)
+    if m.group(2) and sum(ch.isdigit() for ch in s) < 10:
+        return s
+    return "[hidden until payment]"
+
+
 def mask(text: str) -> str:
-    return CONTACT_RE.sub("[hidden until payment]", text)
+    return CONTACT_RE.sub(_mask_one, text)
 
 
 def public_creator(c: dict) -> dict:
@@ -232,9 +239,18 @@ async def get_deal_for(deal_id: str, member: dict) -> dict:
 
 
 async def mark_payment_done(pay: dict, gateway_payment_id: str):
-    if pay["status"] == "paid":
+    if pay["kind"] == "deal":
+        deal = await db.deals.find_one_and_update(
+            {"id": pay["deal_id"], "status": "accepted"},
+            {"$set": {"status": "paid", "paid_at": iso(), "payout_status": "held", "payment_id": pay["id"], "updated_at": iso()},
+             "$push": {"history": {"status": "paid", "at": iso()}}},
+            projection={"_id": 0})
+        if not deal:
+            raise HTTPException(400, "This deal is no longer waiting for payment")
+    claimed = await db.payments.update_one({"id": pay["id"], "status": {"$ne": "paid"}},
+                                           {"$set": {"status": "paid", "gateway_payment_id": gateway_payment_id, "paid_at": iso()}})
+    if not claimed.modified_count:
         return
-    await db.payments.update_one({"id": pay["id"]}, {"$set": {"status": "paid", "gateway_payment_id": gateway_payment_id, "paid_at": iso()}})
     if pay["kind"] == "pro":
         user = await db.users.find_one({"user_id": pay["user_id"]}, {"_id": 0})
         base = now()
@@ -243,9 +259,6 @@ async def mark_payment_done(pay: dict, gateway_payment_id: str):
         await db.users.update_one({"user_id": pay["user_id"]}, {"$set": {"pro_until": (base + timedelta(days=PRO_DAYS)).isoformat()}})
         await notify(pay["user_id"], "payment", "Business Pro is active. Chat and in-app payments are unlocked.", "/app/profile")
     else:
-        deal = await db.deals.find_one({"id": pay["deal_id"]}, {"_id": 0})
-        await db.deals.update_one({"id": pay["deal_id"]}, {"$set": {"status": "paid", "paid_at": iso(), "payout_status": "held"},
-                                                           "$push": {"history": {"status": "paid", "at": iso()}}})
         await notify(deal["creator_id"], "payment", f"Payment received and held for '{deal['plan_label']}'. Start the work!", f"/app/chat/{deal['id']}")
         await notify(deal["business_id"], "payment", "Payment successful. The money is held safely until you approve the work.", f"/app/chat/{deal['id']}")
 
@@ -340,7 +353,10 @@ async def upsert_creator(body: CreatorIn, member: dict = Depends(current_member)
     existing = await db.creators.find_one({"user_id": uid}, {"_id": 0})
     data = body.model_dump()
     if existing:
-        await db.creators.update_one({"user_id": uid}, {"$set": {**data, "updated_at": iso()}})
+        relist = existing.get("status") == "approved" and (data["name"] != existing.get("name") or data["photo"] != existing.get("photo"))
+        await db.creators.update_one({"user_id": uid}, {"$set": {**data, "updated_at": iso(), **({"status": "pending"} if relist else {})}})
+        if relist:
+            await notify(uid, "approval", "You changed your name or photo, so your profile is back under a quick review.", "/app/profile")
     else:
         await db.creators.insert_one({**data, "user_id": uid, "status": "pending", "rating_avg": 0, "rating_count": 0,
                                       "deals_done": 0, "created_at": iso()})
@@ -368,8 +384,11 @@ async def list_businesses(_: dict = Depends(current_member)):
 
 @api.get("/saved")
 async def list_saved(member: dict = Depends(current_member)):
-    ids = [s["creator_id"] for s in await db.saved.find({"user_id": member["user_id"]}, {"_id": 0}).to_list(500)]
-    return await db.creators.find({"user_id": {"$in": ids}, "status": "approved"}, {"_id": 0, "phone": 0, "samples": 0}).to_list(500)
+    rows = await db.saved.find({"user_id": member["user_id"]}, {"_id": 0}).to_list(500)
+    cids = [s["creator_id"] for s in rows if s.get("kind", "creator") == "creator"]
+    bids = [s["creator_id"] for s in rows if s.get("kind") == "business"]
+    return {"creators": await db.creators.find({"user_id": {"$in": cids}, "status": "approved"}, {"_id": 0, "phone": 0, "samples": 0}).to_list(500),
+            "businesses": await db.businesses.find({"user_id": {"$in": bids}}, {"_id": 0, "phone": 0}).to_list(500)}
 
 
 @api.get("/saved/ids")
@@ -378,9 +397,12 @@ async def saved_ids(member: dict = Depends(current_member)):
 
 
 @api.post("/saved/{creator_id}")
-async def save_creator(creator_id: str, member: dict = Depends(current_member)):
+async def save_creator(creator_id: str, kind: Literal["creator", "business"] = "creator", member: dict = Depends(current_member)):
+    col = db.creators if kind == "creator" else db.businesses
+    if not await col.find_one({"user_id": creator_id}):
+        raise HTTPException(404, "Not found")
     await db.saved.update_one({"user_id": member["user_id"], "creator_id": creator_id},
-                              {"$setOnInsert": {"user_id": member["user_id"], "creator_id": creator_id, "created_at": iso()}}, upsert=True)
+                              {"$setOnInsert": {"user_id": member["user_id"], "creator_id": creator_id, "kind": kind, "created_at": iso()}}, upsert=True)
     return {"ok": True}
 
 
@@ -570,6 +592,8 @@ async def verify_payment(body: VerifyIn, member: dict = Depends(current_member))
     pay = await db.payments.find_one({"id": body.payment_id, "user_id": member["user_id"]}, {"_id": 0})
     if not pay:
         raise HTTPException(404, "Payment not found")
+    if pay["status"] == "paid":
+        return {"ok": True}
     if pay["mode"] == "razorpay":
         secret = os.environ.get("RAZORPAY_KEY_SECRET", "")
         expected = hmac.new(secret.encode(), f"{pay['gateway_order_id']}|{body.razorpay_payment_id}".encode(), hashlib.sha256).hexdigest()
@@ -676,6 +700,7 @@ async def startup():
         await db.users.update_many({"role": old}, {"$set": {"role": new}})
     if not await db.creators.find_one({"is_sample": True}):
         await db.creators.insert_many(sample_creator_docs())
+    await db.creators.update_many({"is_sample": True}, {"$set": {"rating_avg": 0, "rating_count": 0, "deals_done": 0}})
     await db.creators.create_index("user_id", unique=True)
     await db.deals.create_index("id", unique=True)
     await db.messages.create_index("deal_id")

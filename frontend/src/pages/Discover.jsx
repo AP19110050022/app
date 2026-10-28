@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Users, Store, MapPin, ChevronDown, Loader2, SearchX, Clock, Plus, Search } from "lucide-react";
+import { Users, Store, MapPin, ChevronDown, Loader2, SearchX, Clock, Plus, Search, Bookmark } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
@@ -36,7 +36,7 @@ const Banner = ({ me, openPlus }) => {
 const CityPill = ({ city, onChange }) => (
   <Select value={city || "any"} onValueChange={(v) => onChange(v === "any" ? "" : v)}>
     <SelectTrigger className="h-11 flex-1 rounded-full border-0 bg-white px-4 text-[14px] font-extrabold text-[#1F1B2E] [&>svg]:hidden" data-testid="city-select">
-      <span className="flex min-w-0 items-center gap-2"><MapPin className="h-4 w-4 shrink-0 text-[#6C4CF1]" /><span className="truncate">{city || "All cities"}</span><span className="text-[13px] font-semibold text-[#5B5675]">· Any distance</span></span>
+      <div className="flex min-w-0 items-center gap-2"><MapPin className="h-4 w-4 shrink-0 text-[#6C4CF1]" /><span className="truncate">{city || "All cities"}</span><span className="shrink-0 text-[13px] font-semibold text-[#5B5675]">· Any distance</span></div>
       <ChevronDown className="h-4 w-4 shrink-0 text-[#5B5675]" />
     </SelectTrigger>
     <SelectContent>
@@ -46,8 +46,9 @@ const CityPill = ({ city, onChange }) => (
   </Select>
 );
 
-const BusinessCard = ({ b, i, onOpen }) => (
-  <button onClick={() => onOpen(b)} data-testid={`business-card-${b.user_id}`} style={{ animationDelay: `${i * 60}ms` }}
+export const BusinessCard = ({ b, i, onOpen, saved, onToggleSave }) => (
+  <div className="relative">
+  <button onClick={() => onOpen?.(b)} data-testid={`business-card-${b.user_id}`} style={{ animationDelay: `${i * 60}ms` }}
     className="rise card-shadow relative w-full overflow-hidden rounded-[26px] bg-gradient-to-br from-[#6C4CF1] to-[#3B25A8] p-4 text-left transition-transform active:scale-[.98]">
     <span className="absolute -right-12 -top-12 h-[190px] w-[190px] rounded-full border-[26px] border-white/15" />
     <div className="relative flex items-center gap-3">
@@ -59,9 +60,15 @@ const BusinessCard = ({ b, i, onOpen }) => (
       <span className="inline-flex h-6 items-center rounded-full bg-white/20 px-2.5 text-[11px] font-bold">Budget {b.budget}</span>
     </div>
   </button>
+  {onToggleSave && (
+    <button onClick={() => onToggleSave(b.user_id)} data-testid={`save-business-${b.user_id}`} aria-label="Save business" className="absolute right-2 top-2 grid h-11 w-11 place-items-center active:scale-90">
+      <span className="grid h-8 w-8 place-items-center rounded-full bg-white/95 text-[#6C4CF1]"><Bookmark className={`h-4 w-4 ${saved ? "fill-[#6C4CF1]" : ""}`} /></span>
+    </button>
+  )}
+  </div>
 );
 
-const Businesses = () => {
+const Businesses = ({ saved, onToggleSave }) => {
   const { api } = useMe();
   const [list, setList] = useState(null);
   const [open, setOpen] = useState(null);
@@ -71,7 +78,7 @@ const Businesses = () => {
   return (
     <>
       <p className="mb-3 text-xs text-white/75">{list.length} businesses are looking for faces. Set up a creator profile so they can send you offers.</p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="business-grid">{list.map((b, i) => <BusinessCard key={b.user_id} b={b} i={i} onOpen={setOpen} />)}</div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="business-grid">{list.map((b, i) => <BusinessCard key={b.user_id} b={b} i={i} onOpen={setOpen} saved={saved.includes(b.user_id)} onToggleSave={onToggleSave} />)}</div>
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
         <DialogContent className="rounded-[28px] border-white/10 text-white" data-testid="business-detail-dialog">
           {open && (<>
@@ -106,10 +113,10 @@ export default function Discover({ search = false }) {
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
   useEffect(() => { api.get("/saved/ids").then((r) => setSaved(r.data)); }, [api]);
 
-  const toggleSave = async (id) => {
+  const toggleSave = async (id, kind = "creator") => {
     const on = saved.includes(id);
     setSaved((s) => (on ? s.filter((x) => x !== id) : [...s, id]));
-    await (on ? api.delete(`/saved/${id}`) : api.post(`/saved/${id}`));
+    await (on ? api.delete(`/saved/${id}`) : api.post(`/saved/${id}`, null, { params: { kind } }));
     toast.success(on ? "Removed from saved" : "Saved");
   };
 
@@ -123,7 +130,7 @@ export default function Discover({ search = false }) {
         </div>
       )}
       {!search && <Seg value={tab} onChange={setTab} options={[["creators", "Creators", Users], ["businesses", "Businesses", Store]]} testid="discover-tabs" />}
-      {tab === "businesses" && !search ? <div className="mt-4"><Businesses /></div> : (
+      {tab === "businesses" && !search ? <div className="mt-4"><Businesses saved={saved} onToggleSave={(id) => toggleSave(id, "business")} /></div> : (
         <>
           <div className="mt-2 flex gap-2">
             <FilterSheet filters={filters} onApply={setFilters} />

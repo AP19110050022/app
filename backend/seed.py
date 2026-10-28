@@ -39,9 +39,9 @@ def sample_creator_docs():
             "rate_per_video": pv,
             "rate_part_time": pt,
             "rate_full_time": ft,
-            "rating_avg": round(4.5 + (i % 5) / 10, 1),
-            "rating_count": 3 + i,
-            "deals_done": 2 + i,
+            "rating_avg": 0,
+            "rating_count": 0,
+            "deals_done": 0,
             "created_at": now,
         })
     return docs

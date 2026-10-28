@@ -23,7 +23,7 @@ import Admin from "@/pages/Admin";
 const Protected = () => (
   <>
     <Show when="signed-in"><MeProvider><AppShell /></MeProvider></Show>
-    <Show when="signed-out"><Navigate to="/sign-in" replace /></Show>
+    <Show when="signed-out"><Navigate to="/" replace /></Show>
   </>
 );
 

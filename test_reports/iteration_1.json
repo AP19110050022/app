@@ -1,0 +1,48 @@
+{
+  "summary": "First full run of HireMyFace. Backend: 26/26 pytest checks pass (auth 401/403, profiles, creator approval, free 2-offer limit returning 402, test-mode Pro upgrade, counter/accept/pay/submit/deliver/release/rate lifecycle, chat masking before and after payment, notifications read, cross-user deal returns 404). Frontend (Playwright, 390px mobile + 1920 desktop): landing, signed-out redirect to /sign-in, Clerk ticket sign-in, refresh keeps session, discover grid of 8 samples, category chips/city select/sort/filter sheet, + FAB role chooser, 2-step business setup, 3-step creator setup (pending), admin approval, creator profile tabs/highlights/save, offer dialog, 3rd offer blocked with toast, chat locked then Upgrade test payment then chat works, masking in UI, full two-sided deal flow in UI including admin release and rating shown on profile, notifications, profile switch mode/UPI save/logout, member redirected away from /app/admin. All core flows work. Found 1 HIGH backend payment bug (from code review, confirmed by reading the code but not run end-to-end) plus a few minor issues.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/payments/order + /api/payments/verify (kind=deal)", "issue": "You can create several payment orders for the same deal while it is 'accepted', and verify only checks payment.status. Verifying a second or stale payment later runs mark_payment_done again. That sets deal.status back to 'paid' and payout_status to 'held' even if the deal is already delivered or completed, and records a double charge. Verify also never checks that the deal is still 'accepted', so a deal cancelled after its order was created can still be marked paid. Fix: in verify, for kind=deal, require deal.status=='accepted' (or do an atomic find_one_and_update on {id, status:'accepted'}). Reuse or reject an existing open order for the same deal. Make the payment status change atomic (update_one({id, status:{$ne:'paid'}})) so two verifies at the same time can't extend Pro twice.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "mask() / CONTACT_RE", "issue": "The phone pattern also matches ISO dates: 'Shoot on 2026-12-20' becomes 'Shoot on [hidden until payment]'. Dates are normal deal talk, so this is a false positive. Require 10+ digits, or exclude the YYYY-MM-DD pattern."},
+      {"endpoint": "POST /api/deals free limit", "issue": "Declined and cancelled offers still count toward the 2 free offers a month. This may be intended; please confirm."},
+      {"endpoint": "PUT /api/creators/me", "issue": "Editing an approved profile keeps status 'approved', so name and photo changes skip admin moderation."},
+      {"endpoint": "POST /api/saved/{creator_id}", "issue": "Doesn't check that the creator exists. Any string can be saved."},
+      {"endpoint": "DELETE /api/me", "issue": "Leaves deals, messages and payments behind, still pointing at the deleted user and creator."},
+      {"endpoint": "seed sample creators", "issue": "Samples show e.g. '4.5★ 3 reviews' and 'Jobs done 2', but the Reviews tab says 'No reviews yet'. Inconsistent."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Logout", "issue": "profile-logout-button sends the user to /sign-in instead of the landing page '/'. The Protected route redirect fires before afterSignOutUrl. Still a signed-out UI, so minor.", "affected_selectors": ["[data-testid='profile-logout-button']"]}
+    ],
+    "design_issues": [
+      {"screen": "Offer dialog", "issues": ["The start date uses the browser's native <input type=date> instead of a shadcn Calendar/Popover date picker."]},
+      {"screen": "Deal room", "issues": ["Counter and submit-work actions show a generic 'Updated' toast. Use specific messages like 'Counter-offer sent' or 'Work submitted'."]},
+      {"screen": "Admin > Users", "issues": ["The subtitle shows 'no role yet' (meaning active_mode is null) right next to the role select showing 'admin' or 'member'. Confusing; rename it to something like 'no profile yet'."]},
+      {"screen": "Creator profile (sample)", "issues": ["The header stats show reviews, but the Reviews tab is empty for samples."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_hiremyface_api.py", "/app/backend/tests/clerk_helper.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "HIGH: Harden the deal payment verify path: check that the deal is still 'accepted', block or reuse duplicate orders for the same deal, and make the paid transition atomic.",
+    "Make the contact-mask regex stop masking dates (YYYY-MM-DD).",
+    "Optional: send approved creator profile edits back for re-review; validate creator_id in POST /saved; clean up related data in DELETE /me.",
+    "Replace the native date input in OfferDialog with the shadcn Calendar.",
+    "Use specific toast text for deal actions; fix the 'no role yet' label in the admin users list; make logout land on '/'."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 701 lines, at the 700-line limit. Split it into routers (deals, payments, admin, profiles).",
+    "mark_payment_done reads then writes without a condition, so concurrent verifies race and can extend Pro twice.",
+    "Payout math is correct: 10% fee, a ₹2,600 deal releases ₹2,340. Admin endpoints are correctly gated by require_role('admin'). _id is excluded everywhere checked. The creator's phone is stripped from public creator endpoints."
+  ],
+  "updated_files": ["/app/backend/tests/test_hiremyface_api.py", "/app/backend/tests/clerk_helper.py"],
+  "success_rate": {"backend": "100% (26/26 tests; 1 HIGH bug found by code review)", "frontend": "~97% (all requested flows passed; minor UX issues only)"},
+  "test_credentials": "Used admin/brand/creator +clerk_test users from /app/memory/test_credentials.md through Clerk sign-in tickets (UI) and session JWTs (API). All 3 users still exist.",
+  "seed_data_creation": "Brand user has business 'TEST_Chai Point Cafe' and Business Pro active (test payment). Creator user has approved creator profile 'TEST_Meera Creator' (rating 4.0 from the UI flow) with UPI meera2@upi. One completed UI deal between them. Removed the temporary 'TEST_Creator Biz' business. The pytest module fixture resets the brand's deals and Pro status and the creator's profile on each run.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the backend suite serially: cd /app/backend && python -m pytest tests/test_hiremyface_api.py -n 0. pytest.ini forces xdist -n 2, which breaks the ordered stateful flow. Get tokens with: python tests/clerk_helper.py ticket <admin|brand|creator>, which writes /tmp/ticket_<who>; the browser script reads that file and opens /sign-in?__clerk_ticket=... Tickets are single-use, so mint a new one for every browser run. In extra browser contexts, save screenshots as .jpeg (png + quality errors). ChipSelect testids slugify the label: '₹5k–20k' becomes 'business-budget--5k-20k'. Retest the payment verify hardening once it is fixed."
+}

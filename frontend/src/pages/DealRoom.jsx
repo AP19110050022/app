@@ -134,7 +134,8 @@ export default function DealRoom() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [msgs.length]);
 
   const act = async (action, extra = {}) => {
-    try { await api.post(`/deals/${id}/action`, { action, ...extra }); toast.success("Updated"); reload(); } catch (e) { toast.error(errMsg(e)); }
+    const msg = { accept: "Offer accepted", decline: "Offer declined", counter: "Counter-offer sent", accept_counter: "Counter accepted", cancel: "Offer cancelled", submit_work: "Work submitted", mark_delivered: "Marked as delivered" }[action];
+    try { await api.post(`/deals/${id}/action`, { action, ...extra }); toast.success(msg); reload(); } catch (e) { toast.error(errMsg(e)); }
   };
   const send = async (text) => { try { await api.post(`/deals/${id}/messages`, { text }); reload(); } catch (e) { toast.error(errMsg(e)); } };
 

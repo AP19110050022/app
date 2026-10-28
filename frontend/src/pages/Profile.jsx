@@ -90,7 +90,7 @@ export default function Profile() {
       <div className="glass overflow-hidden rounded-[24px] divide-y divide-white/10">
         {me.business && <Row to="/app/upgrade" icon={Crown} label={me.is_pro ? "Business Pro" : "Upgrade to Business Pro"} testid="profile-upgrade-button"
           right={<span className="text-xs text-white/70">{me.is_pro ? `until ${new Date(me.user.pro_until).toLocaleDateString()}` : `${me.offers_this_month}/2 offers used`}</span>} />}
-        <Row to="/app/saved" icon={Bookmark} label="Saved creators" testid="profile-link-saved" />
+        <Row to="/app/saved" icon={Bookmark} label="Saved creators & businesses" testid="profile-link-saved" />
         {me.user.role === "admin" && <Row to="/app/admin" icon={ShieldCheck} label="Admin panel" testid="profile-link-admin" />}
       </div>
       {payments.length > 0 && (
