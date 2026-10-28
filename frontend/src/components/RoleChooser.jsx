@@ -1,22 +1,19 @@
 import { useNavigate } from "react-router-dom";
-import { Clapperboard, Briefcase, ArrowRight, Pencil, Repeat } from "lucide-react";
+import { Play, Store, ChevronRight, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useMe } from "@/context/MeContext";
 import { toast } from "sonner";
 
-const Option = ({ icon: Icon, title, text, badge, tone, onClick, testid, actionLabel }) => (
+const Option = ({ icon: Icon, title, text, tag, tone, onClick, testid }) => (
   <button onClick={onClick} data-testid={testid}
-    className="group relative w-full overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 text-left transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-xl hover:shadow-violet-500/10">
-    <div className={`absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-20 blur-2xl ${tone}`} />
-    <div className="flex items-start gap-4">
-      <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-lg ${tone}`}><Icon className="h-6 w-6" /></span>
-      <div className="flex-1">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-violet-600">{badge}</span>
-        <h3 className="font-heading text-lg font-bold text-slate-900">{title}</h3>
-        <p className="mt-1 text-sm text-slate-500">{text}</p>
-        <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-violet-700">{actionLabel}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></span>
-      </div>
+    className="glass group flex w-full items-center gap-4 rounded-[24px] p-4 text-left transition-[background-color,transform] duration-200 hover:bg-white/20 active:scale-[.98]">
+    <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-white shadow-lg ${tone}`}><Icon className="h-6 w-6" /></span>
+    <div className="min-w-0 flex-1">
+      <p className="text-lg font-extrabold tracking-tight">{title}</p>
+      <p className="text-[13px] leading-snug text-white/75">{text}</p>
+      <span className="mt-1.5 inline-block rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-bold">{tag}</span>
     </div>
+    <ChevronRight className="h-5 w-5 shrink-0 text-white/60 transition-transform group-hover:translate-x-1" />
   </button>
 );
 
@@ -35,30 +32,25 @@ export const RoleChooser = ({ open, onOpenChange }) => {
       await refresh();
       toast.success(`Switched to ${kind} mode`);
     }
-    navigate(kind === "creator" ? "/app/deals" : "/app/search");
+    navigate(kind === "creator" ? "/app/deals" : "/app");
   };
+  const tag = (has, kind) => (has ? (mode === kind ? "Active now" : "Tap to switch") : kind === "creator" ? "3 quick steps" : "2 quick steps");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-3xl" data-testid="role-chooser-dialog">
-        <DialogHeader>
-          <DialogTitle className="font-heading text-2xl">What would you like to do?</DialogTitle>
-          <DialogDescription>One account, two sides. You can switch any time from your profile.</DialogDescription>
+      <DialogContent className="max-w-md rounded-[28px] border-white/10 bg-gradient-to-b from-[#4530C8] to-[#2A1B7A] text-white" data-testid="role-chooser-dialog">
+        <DialogHeader className="text-left">
+          <DialogTitle className="font-heading text-[26px] font-extrabold leading-tight text-white">How will you use<br />HireMyFace?</DialogTitle>
+          <DialogDescription className="text-white/75">One account, two sides. Switch any time.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <Option icon={Clapperboard} tone="bg-gradient-to-br from-violet-600 to-fuchsia-500" badge={hasC ? (mode === "creator" ? "Active" : "Profile ready") : "Earn with your face"}
-            title="Become a Creator" text="Get hired by brands for reels, shorts, ads and live sessions. Set your own prices."
-            actionLabel={hasC ? (mode === "creator" ? "Go to my deals" : "Switch to creator mode") : "Set up in 3 steps"}
-            onClick={() => go("creator")} testid="role-option-creator" />
-          <Option icon={Briefcase} tone="bg-gradient-to-br from-indigo-600 to-sky-500" badge={hasB ? (mode === "business" ? "Active" : "Profile ready") : "Grow your brand"}
-            title="Hire as a Business" text="Find the right face for your brand, send offers and pay safely in the app."
-            actionLabel={hasB ? (mode === "business" ? "Find creators" : "Switch to business mode") : "Set up in 2 steps"}
-            onClick={() => go("business")} testid="role-option-business" />
+          <Option icon={Play} tone="bg-gradient-to-br from-[#7C5CFF] to-[#FF5FA2]" title="I'm a creator" text="Appear on camera and get hired to promote brands." tag={tag(hasC, "creator")} onClick={() => go("creator")} testid="role-option-creator" />
+          <Option icon={Store} tone="bg-gradient-to-br from-[#3B82F6] to-[#7C5CFF]" title="I'm a business" text="Hire presenters for your store, brand or service." tag={tag(hasB, "business")} onClick={() => go("business")} testid="role-option-business" />
         </div>
         {(hasC || hasB) && (
-          <div className="flex flex-wrap gap-2 pt-1 text-sm">
-            {hasC && <button className="inline-flex items-center gap-1 text-slate-500 hover:text-violet-700" onClick={() => { onOpenChange(false); navigate("/app/setup/creator"); }} data-testid="role-edit-creator"><Pencil className="h-3.5 w-3.5" />Edit creator profile</button>}
-            {hasB && <button className="inline-flex items-center gap-1 text-slate-500 hover:text-violet-700" onClick={() => { onOpenChange(false); navigate("/app/setup/business"); }} data-testid="role-edit-business"><Repeat className="h-3.5 w-3.5" />Edit business profile</button>}
+          <div className="flex flex-wrap gap-4 pt-1 text-[13px] font-semibold text-white/75">
+            {hasC && <button className="flex items-center gap-1 hover:text-white" onClick={() => { onOpenChange(false); navigate("/app/setup/creator"); }} data-testid="role-edit-creator"><Pencil className="h-3.5 w-3.5" />Edit creator profile</button>}
+            {hasB && <button className="flex items-center gap-1 hover:text-white" onClick={() => { onOpenChange(false); navigate("/app/setup/business"); }} data-testid="role-edit-business"><Pencil className="h-3.5 w-3.5" />Edit business profile</button>}
           </div>
         )}
       </DialogContent>

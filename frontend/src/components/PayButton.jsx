@@ -65,22 +65,22 @@ export const PayButton = ({ body, label, onPaid, testid = "pay-button", classNam
 
   return (
     <>
-      <Button onClick={start} disabled={busy} className={`gap-2 rounded-full ${className}`} data-testid={testid}>
+      <Button onClick={start} disabled={busy} className={`h-11 gap-2 rounded-full px-5 font-extrabold ${className}`} data-testid={testid}>
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} {label}
       </Button>
       <Dialog open={!!testOrder} onOpenChange={(o) => !o && setTestOrder(null)}>
-        <DialogContent data-testid="test-payment-dialog">
+        <DialogContent className="rounded-[28px] border-white/10 text-white" data-testid="test-payment-dialog">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-heading"><FlaskConical className="h-5 w-5 text-violet-600" />Test payment</DialogTitle>
-            <DialogDescription>Razorpay keys aren't added yet, so this is a simulated payment. No real money moves.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-white"><FlaskConical className="h-5 w-5" />Test payment</DialogTitle>
+            <DialogDescription className="text-white/70">Razorpay keys aren't added yet, so this is a simulated payment. No real money moves.</DialogDescription>
           </DialogHeader>
           {testOrder && (
-            <div className="rounded-2xl bg-violet-50 p-4">
-              <p className="text-sm text-slate-600">{testOrder.description}</p>
-              <p className="font-heading text-3xl font-bold text-slate-900">{inr(testOrder.amount / 100)}</p>
+            <div className="rounded-2xl bg-white/10 p-4">
+              <p className="text-sm text-white/75">{testOrder.description}</p>
+              <p className="text-3xl font-extrabold">{inr(testOrder.amount / 100)}</p>
             </div>
           )}
-          <Button onClick={confirmTest} disabled={busy} className="rounded-full" data-testid="test-payment-confirm-button">
+          <Button onClick={confirmTest} disabled={busy} className="cta h-12 rounded-full font-extrabold" data-testid="test-payment-confirm-button">
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Complete test payment
           </Button>
         </DialogContent>

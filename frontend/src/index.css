@@ -17,25 +17,25 @@ h1, h2, h3, h4, .font-heading {
 
 @layer base {
     :root {
-        --background: 210 40% 98%;
-        --foreground: 222 47% 11%;
-        --card: 0 0% 100%;
-        --card-foreground: 222 47% 11%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 222 47% 11%;
-        --primary: 262 83% 58%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 250 100% 97%;
-        --secondary-foreground: 263 70% 40%;
-        --muted: 210 40% 96%;
-        --muted-foreground: 215 16% 47%;
-        --accent: 251 91% 95%;
-        --accent-foreground: 263 70% 40%;
-        --destructive: 350 89% 60%;
+        --background: 253 57% 17%;
+        --foreground: 0 0% 100%;
+        --card: 253 57% 17%;
+        --card-foreground: 0 0% 100%;
+        --popover: 253 55% 20%;
+        --popover-foreground: 0 0% 100%;
+        --primary: 0 0% 100%;
+        --primary-foreground: 251 64% 40%;
+        --secondary: 252 45% 32%;
+        --secondary-foreground: 0 0% 100%;
+        --muted: 252 45% 26%;
+        --muted-foreground: 250 40% 82%;
+        --accent: 252 50% 34%;
+        --accent-foreground: 0 0% 100%;
+        --destructive: 4 90% 62%;
         --destructive-foreground: 0 0% 100%;
-        --border: 214 32% 91%;
-        --input: 214 32% 88%;
-        --ring: 262 83% 58%;
+        --border: 252 40% 38%;
+        --input: 252 40% 45%;
+        --ring: 333 100% 69%;
         --chart-1: 262 83% 58%;
         --chart-2: 243 75% 59%;
         --chart-3: 330 81% 60%;
@@ -50,20 +50,44 @@ h1, h2, h3, h4, .font-heading {
         @apply border-border;
     }
     body {
-        @apply bg-background text-foreground;
+        @apply text-foreground;
+        background: linear-gradient(180deg, #2A1B7A 0%, #4530C8 38%, #33209A 70%, #1F1150 100%) fixed;
+        min-height: 100vh;
     }
     ::selection {
-        background: #DDD6FE;
-        color: #4C1D95;
+        background: #FF5FA2;
+        color: #fff;
     }
 }
 
 @layer utilities {
     .brand-gradient {
-        background-image: linear-gradient(135deg, #7C3AED 0%, #4F46E5 60%, #3B82F6 100%);
+        background-image: linear-gradient(135deg, #7C5CFF 0%, #5B3BE8 55%, #3B25A8 100%);
     }
+    .cta {
+        background-image: linear-gradient(90deg, #FF5FA2 0%, #B35CFF 55%, #7C5CFF 100%);
+        color: #fff;
+        box-shadow: 0 12px 30px rgba(255, 95, 162, .3);
+    }
+    .glass {
+        background: rgba(255, 255, 255, .12);
+        border: 1px solid rgba(255, 255, 255, .22);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+    }
+    .glass-soft {
+        background: rgba(255, 255, 255, .08);
+        border: 1px solid rgba(255, 255, 255, .14);
+    }
+    .topbar {
+        background: rgba(36, 20, 100, .92);
+        box-shadow: 0 6px 18px rgba(10, 5, 40, .25);
+        backdrop-filter: blur(16px);
+    }
+    .card-shadow { box-shadow: 0 12px 24px rgba(8, 4, 36, .35); }
+    .ring-story { background: conic-gradient(from 180deg, #FF5FA2, #FFB86B, #7C5CFF, #FF5FA2); }
     .brand-text {
-        background-image: linear-gradient(90deg, #7C3AED, #4F46E5 55%, #EC4899);
+        background-image: linear-gradient(90deg, #FFFFFF, #E3DCFF 50%, #FF8CC0);
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;

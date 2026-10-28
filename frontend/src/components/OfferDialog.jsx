@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Send, Loader2, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/Stepper";
 import { PLANS } from "@/constants/options";
 import { useMe } from "@/context/MeContext";
 import { errMsg, inr } from "@/lib/api";
+
+const Box = ({ children, testid }) => (
+  <DialogContent className="max-h-[92vh] overflow-y-auto rounded-[28px] border-white/10 bg-gradient-to-b from-[#4530C8] to-[#2A1B7A] text-white sm:max-w-lg" data-testid={testid}>{children}</DialogContent>
+);
 
 export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_video" }) => {
   const { me, api, config, refresh } = useMe();
@@ -48,60 +51,52 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
   if (!me?.business) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="rounded-3xl" data-testid="offer-need-business-dialog">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-xl">Set up your business first</DialogTitle>
-            <DialogDescription>It takes 2 quick steps. Creators see your company name and logo with every offer.</DialogDescription>
+        <Box testid="offer-need-business-dialog">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-2xl font-extrabold text-white">Set up your business first</DialogTitle>
+            <DialogDescription className="text-white/75">2 quick steps. Creators see your brand name with every offer.</DialogDescription>
           </DialogHeader>
-          <Button className="rounded-full" onClick={() => navigate(`/app/setup/business?next=/app/creator/${creator.user_id}`)} data-testid="offer-setup-business-button">Create business profile</Button>
-        </DialogContent>
+          <button className="cta h-12 rounded-full font-extrabold" onClick={() => navigate(`/app/setup/business?next=/app/creator/${creator.user_id}`)} data-testid="offer-setup-business-button">Create business profile</button>
+        </Box>
       </Dialog>
     );
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto rounded-3xl sm:max-w-lg" data-testid="offer-dialog">
-        <DialogHeader>
-          <DialogTitle className="font-heading text-xl">Send an offer to {creator.name}</DialogTitle>
-          <DialogDescription>Pick a plan, describe what you need and propose a price.</DialogDescription>
+      <Box testid="offer-dialog">
+        <DialogHeader className="text-left">
+          <DialogTitle className="text-2xl font-extrabold text-white">Hire {creator.name}</DialogTitle>
+          <DialogDescription className="text-white/75">Pick a plan, describe what you need, and propose a price.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-3 gap-2">
             {PLANS.map((p) => (
               <button type="button" key={p.id} onClick={() => pick(p)} data-testid={`offer-plan-${p.id}`}
-                className={`rounded-2xl border p-3 text-left transition-[border-color,background-color] ${plan === p.id ? "border-violet-600 bg-violet-50" : "border-slate-200 hover:border-violet-300"}`}>
-                <p.icon className={`h-5 w-5 ${plan === p.id ? "text-violet-600" : "text-slate-400"}`} />
-                <p className="mt-1 text-sm font-semibold">{p.label}</p>
-                <p className="text-xs text-slate-500">{inr(creator[p.rate])}{p.unit}</p>
+                className={`rounded-[18px] border p-3 text-left transition-colors ${plan === p.id ? "border-white bg-white text-[#3B25A8]" : "border-white/25 bg-white/10 hover:bg-white/20"}`}>
+                <p.icon className="h-5 w-5" />
+                <p className="mt-1 text-sm font-extrabold">{p.label}</p>
+                <p className="text-[11px] opacity-75">{inr(creator[p.rate])}{p.unit}</p>
               </button>
             ))}
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="brief">Brief</Label>
-            <Textarea id="brief" required minLength={10} rows={4} value={brief} onChange={(e) => setBrief(e.target.value)}
-              placeholder="e.g. 30-second Instagram reel showing our new cold coffee, shot in our café, Hindi + English." data-testid="offer-brief-input" />
-          </div>
+          <Field label="Brief">
+            <Textarea required minLength={10} rows={4} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="e.g. 30-second Instagram reel showing our new cold coffee, shot in our café, Hindi + English." data-testid="offer-brief-input" />
+          </Field>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="date">Start date</Label>
-              <Input id="date" type="date" required value={date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} data-testid="offer-date-input" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="price">Your price (₹)</Label>
-              <Input id="price" type="number" required min={100} value={price} onChange={(e) => setPrice(e.target.value)} data-testid="offer-price-input" />
-            </div>
+            <Field label="Start date"><Input type="date" required value={date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} className="[color-scheme:dark]" data-testid="offer-date-input" /></Field>
+            <Field label="Your price (₹)"><Input type="number" required min={100} value={price} onChange={(e) => setPrice(e.target.value)} data-testid="offer-price-input" /></Field>
           </div>
           {!me.is_pro && (
-            <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800" data-testid="offer-free-limit-note">
+            <p className="flex items-start gap-2 rounded-2xl bg-white/10 p-3 text-xs text-white/85" data-testid="offer-free-limit-note">
               <Info className="mt-0.5 h-4 w-4 shrink-0" /> Free plan: {left} of {limit} offers left this month. Chat and payments need Business Pro.
             </p>
           )}
-          <Button type="submit" disabled={busy} className="w-full gap-2 rounded-full" data-testid="offer-submit-button">
+          <button type="submit" disabled={busy} className="cta flex h-[52px] w-full items-center justify-center gap-2 rounded-full font-extrabold disabled:opacity-60" data-testid="offer-submit-button">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send offer · {inr(price)}
-          </Button>
+          </button>
         </form>
-      </DialogContent>
+      </Box>
     </Dialog>
   );
 };

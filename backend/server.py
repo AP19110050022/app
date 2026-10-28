@@ -361,6 +361,11 @@ async def upsert_business(body: BusinessIn, member: dict = Depends(current_membe
 
 
 # ---------- saved ----------
+@api.get("/businesses")
+async def list_businesses(_: dict = Depends(current_member)):
+    return await db.businesses.find({}, {"_id": 0, "phone": 0}).sort("created_at", -1).to_list(200)
+
+
 @api.get("/saved")
 async def list_saved(member: dict = Depends(current_member)):
     ids = [s["creator_id"] for s in await db.saved.find({"user_id": member["user_id"]}, {"_id": 0}).to_list(500)]

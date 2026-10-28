@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 
-export const ChipSelect = ({ options, value, onChange, multi = false, testid, max }) => {
+export const ChipSelect = ({ options, value, onChange, multi = false, testid, max, tiles = false }) => {
   const isOn = (o) => (multi ? (value || []).includes(o) : value === o);
   const toggle = (o) => {
     if (!multi) return onChange(value === o ? "" : o);
@@ -10,7 +10,7 @@ export const ChipSelect = ({ options, value, onChange, multi = false, testid, ma
     onChange([...cur, o]);
   };
   return (
-    <div className="flex flex-wrap gap-2" data-testid={testid}>
+    <div className={tiles ? "grid grid-cols-2 gap-2.5" : "flex flex-wrap gap-2"} data-testid={testid}>
       {options.map((opt) => {
         const o = typeof opt === "string" ? opt : opt.id;
         const Icon = typeof opt === "string" ? null : opt.icon;
@@ -21,11 +21,11 @@ export const ChipSelect = ({ options, value, onChange, multi = false, testid, ma
             key={o}
             onClick={() => toggle(o)}
             data-testid={`${testid}-${o.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-[background-color,color,border-color,transform] duration-200 active:scale-95 ${
-              on ? "border-violet-600 bg-violet-600 text-white shadow-md shadow-violet-500/25" : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50"
-            }`}
+            className={`inline-flex items-center gap-2 border font-semibold transition-[background-color,color,transform] duration-200 active:scale-95 ${
+              tiles ? "min-h-[56px] rounded-2xl px-4 text-left text-sm" : "rounded-full px-3.5 py-1.5 text-sm"
+            } ${on ? "border-white bg-white text-[#3B25A8] shadow-lg shadow-black/20" : "border-white/25 bg-white/10 text-white hover:bg-white/20"}`}
           >
-            {on && multi ? <Check className="h-3.5 w-3.5" /> : Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+            {on && multi ? <Check className="h-4 w-4" /> : Icon ? <Icon className="h-4 w-4" /> : null}
             {o}
           </button>
         );
