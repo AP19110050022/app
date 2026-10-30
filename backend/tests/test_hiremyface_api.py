@@ -35,6 +35,7 @@ def reset_state(db):
     # Reset the 3 test users to a known baseline (allowed per request)
     deal_ids = [d["id"] for d in db.deals.find({"$or": [{"business_id": BRAND}, {"creator_id": CREATOR}]}, {"id": 1})]
     db.messages.delete_many({"deal_id": {"$in": deal_ids}})
+    db.payouts.delete_many({"deal_id": {"$in": deal_ids}})
     db.deals.delete_many({"id": {"$in": deal_ids}})
     db.payments.delete_many({"user_id": {"$in": [BRAND, CREATOR]}})
     db.creators.delete_many({"user_id": CREATOR})
@@ -52,7 +53,7 @@ class TestAuth:
     def test_public_endpoints(self):
         assert requests.get(f"{API}/").status_code == 200
         cfg = requests.get(f"{API}/config").json()
-        assert cfg["payments_mode"] == "test" and cfg["pro_price"] == 999 and cfg["free_offer_limit"] == 2
+        assert cfg["payments_mode"] == "test" and cfg["pro_price"] == 999 and cfg["free_contacts"] == 3  # iter4: free_offer_limit replaced by free_contacts
         cr = requests.get(f"{API}/creators").json()
         assert len([c for c in cr if c["user_id"].startswith("sample_")]) == 8
         assert all("phone" not in c for c in cr)
@@ -124,8 +125,9 @@ class TestOffers:
         r2 = mk("sample_1")
         assert r2.status_code == 200
         ST["sample_deal"] = r2.json()["id"]
-        r3 = mk("sample_2")
-        assert r3.status_code == 402 and "Free plan" in r3.json()["detail"]
+        assert mk("sample_2").status_code == 200  # iter4: free business may contact 3 creators
+        r4 = mk("sample_3")
+        assert r4.status_code == 402 and "Free accounts" in r4.json()["detail"]
 
     def test_brief_validation(self, tok):
         r = requests.post(f"{API}/deals", json={"creator_id": "sample_1", "plan": "per_video", "brief": "short",
@@ -136,11 +138,9 @@ class TestOffers:
         assert requests.get(f"{API}/deals/{ST['sample_deal']}", headers=H(tok["creator"])).status_code == 404
         assert requests.get(f"{API}/deals/{ST['sample_deal']}/messages", headers=H(tok["creator"])).status_code == 404
 
-    def test_chat_locked_for_free(self, tok):
+    def test_chat_open_for_free_contact(self, tok):  # iter4: free-contact threads are open without Pro
         d = requests.get(f"{API}/deals/{ST['deal']}", headers=H(tok["brand"])).json()
-        assert d["chat_open"] is False
-        r = requests.post(f"{API}/deals/{ST['deal']}/messages", json={"text": "hi"}, headers=H(tok["brand"]))
-        assert r.status_code == 402
+        assert d["chat_open"] is True and d["free_chat"] is True
 
     def test_upgrade_pro(self, tok):
         o = requests.post(f"{API}/payments/order", json={"kind": "pro"}, headers=H(tok["brand"]))

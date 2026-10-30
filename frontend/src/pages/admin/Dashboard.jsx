@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Users, Clapperboard, Store, Crown, Briefcase, Handshake, CheckCircle2, IndianRupee, Wallet, Send, BadgeCheck, Flag, Scale, AlertTriangle, FlaskConical } from "lucide-react";
 import { Seg } from "@/components/AppBits";
 import { inr } from "@/lib/api";
+import { useMe } from "@/context/MeContext";
 import { H1, Spinner, useAdminData } from "@/pages/admin/bits";
 import { Growth } from "@/pages/admin/Growth";
 import { Journey } from "@/pages/admin/Journey";
@@ -25,6 +26,7 @@ const Attention = ({ to, icon: Icon, label, n, testid }) => (
 );
 
 export default function AdminDashboard() {
+  const { config } = useMe();
   const [range, setRange] = useState("all");
   const [s] = useAdminData("/admin/stats", { range });
   return (
@@ -42,7 +44,7 @@ export default function AdminDashboard() {
         {s.money_mode === "test" && <p className="mb-3 flex items-center gap-2 rounded-2xl bg-yellow-300/15 px-3.5 py-2.5 text-xs text-yellow-100" data-testid="admin-money-mocked"><FlaskConical className="h-4 w-4 shrink-0" />Payments, payouts and refunds are in TEST MODE (MOCKED) until Razorpay keys are added. No real money moves.</p>}
         <div className="grid gap-3 sm:grid-cols-3">
           <Card big icon={IndianRupee} label="Paid by businesses" value={inr(s.paid_by_businesses)} testid="stat-paid" />
-          <Card big icon={Wallet} label="Platform earnings" sub="10% fee + Pro subscriptions" value={inr(s.platform_earnings)} testid="stat-earnings" />
+          <Card big icon={Wallet} label="Platform earnings" sub={`${config?.fee_pct ?? 10}% fee + Pro subscriptions`} value={inr(s.platform_earnings)} testid="stat-earnings" />
           <Card big icon={Send} label="Paid out to creators" value={inr(s.paid_out)} testid="stat-paid-out" />
         </div>
         <p className="mb-2 mt-8 text-xs font-extrabold uppercase tracking-widest text-white/55">People & activity</p>

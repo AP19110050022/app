@@ -29,6 +29,8 @@ One account, + chooser (creator 3 steps / business 2 steps); 3 plans Per Video /
 
 - Iteration 4 (Admin panel, /admin): owner = OWNER_EMAIL (ganeshreddypittu111@gmail.com), helper admins added by email (or invite consumed at sign-up). Dashboard (today/7d/30d/all, money, needs-attention), creator approvals with rejection reason, users search/filters/detail, block/unblock (403 account_blocked + Clerk session revoke, content hidden, deals paused), jobs/posts removal, deals & payouts (auto payout on business approval, failed→retry/auto-retry on UPI save), reports (creator/business/job/deal) & disputes (release/refund), team (owner only), activity log. Payouts/refunds TEST MODE (MOCKED). iteration_3: backend 18/19 → fixed (admin chat impersonation), frontend all flows passed.
 
+- Iteration 5: real chat threads (Message → /app/chat, status "chat", Send offer inside chat converts same thread); free businesses contact up to N creators (default 3, chats free), Pro unlimited; public profile visit counts; admin Prices page (owner edits Pro price/days, fee %, free contacts); Growth charts (users, profiles & deals, earnings; 30/90/365 days); User journey (pages reached, where people stop with exit rate & avg time, setup-step tracking, account funnel). iteration_4: backend 100%, frontend flows passed; follow-up fixes for funnel display, dynamic price copy, track whitelist/dedupe.
+
 ## Backlog
 - P2 (admin): growth charts, spreadsheet export, broadcast announcements, verified-badge control
 - P3 (admin): finer helper roles, auto-flagging, daily admin email summary

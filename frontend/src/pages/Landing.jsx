@@ -50,7 +50,7 @@ export default function Landing() {
           <p className="text-center text-xs text-white/60">Continue with Google or email. Choose creator or business after you sign in.</p>
         </div>
         <div className="mt-10 grid grid-cols-2 gap-3">
-          {[[Play, "Creators", "Join free, set your own prices, get paid to UPI.", "from-[#7C5CFF] to-[#FF5FA2]"], [Store, "Businesses", "Message 3 creators free. Pro unlocks unlimited chats & payments.", "from-[#3B82F6] to-[#7C5CFF]"]].map(([Icon, t, d, tone]) => (
+          {[[Play, "Creators", "Join free, set your own prices, get paid to UPI.", "from-[#7C5CFF] to-[#FF5FA2]"], [Store, "Businesses", "Message creators free. Pro unlocks unlimited chats & payments.", "from-[#3B82F6] to-[#7C5CFF]"]].map(([Icon, t, d, tone]) => (
             <div key={t} className="glass rounded-[22px] p-4" data-testid={`landing-side-${t.toLowerCase()}`}>
               <span className={`grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br ${tone}`}><Icon className="h-5 w-5" /></span>
               <p className="mt-3 font-extrabold">{t}</p>

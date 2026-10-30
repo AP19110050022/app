@@ -15,7 +15,13 @@ const NAMES = [
   [/^\/app\/upgrade/, "Upgrade to Pro"], [/^\/app\/profile/, "My profile"], [/^\/app\/settings/, "Settings"], [/^\/app\/posts/, "My posts"],
 ];
 
-export const track = (page) => { publicApi.post("/track", { session_id: sessionId(), page }).catch(() => {}); };
+export const track = (page) => {
+  const last = sessionStorage.getItem("hmf_last");
+  const stamp = `${page}|${Math.floor(Date.now() / 2000)}`;
+  if (last === stamp) return;
+  sessionStorage.setItem("hmf_last", stamp);
+  publicApi.post("/track", { session_id: sessionId(), page }).catch(() => {});
+};
 
 export function RouteTracker() {
   const { pathname } = useLocation();

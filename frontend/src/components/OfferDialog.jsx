@@ -92,7 +92,7 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
           </div>
           {!me.is_pro && (
             <p className="flex items-start gap-2 rounded-2xl bg-white/10 p-3 text-xs text-white/85" data-testid="offer-free-limit-note">
-              <Info className="mt-0.5 h-4 w-4 shrink-0" /> Free plan: you can contact {limit} creators ({left} left). Chatting with them is free; paying in the app needs Business Pro.
+              <Info className="mt-0.5 h-4 w-4 shrink-0" /> Free plan: you can contact {limit} creators ({left} left). Chatting with them is free; paying in the app needs Business Pro.{left === 0 && <> Already used up? <button type="button" onClick={() => navigate("/app/upgrade")} className="font-extrabold underline" data-testid="offer-upgrade-link">Upgrade</button> to contact new creators.</>}
             </p>
           )}
           <button type="submit" disabled={busy} className="cta flex h-[52px] w-full items-center justify-center gap-2 rounded-full font-extrabold disabled:opacity-60" data-testid="offer-submit-button">

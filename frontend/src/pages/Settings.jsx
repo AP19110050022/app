@@ -21,7 +21,7 @@ const Item = ({ value, icon: Icon, title, children }) => (
 );
 
 export default function SettingsPage() {
-  const { me, api, refresh } = useMe();
+  const { me, api, refresh, config } = useMe();
   const navigate = useNavigate();
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -48,7 +48,7 @@ export default function SettingsPage() {
           ))}
         </Item>
         <Item value="payments" icon={Wallet} title="Payments & payouts">
-          <p>Businesses pay inside the app. The money is held until the business approves the work, then the payout goes to the creator's UPI minus a 10% service fee.</p>
+          <p>Businesses pay inside the app. The money is held until the business approves the work, then the payout goes to the creator's UPI minus a {config?.fee_pct ?? 10}% service fee.</p>
           {me.creator && <div className="flex gap-2"><Input value={upi} onChange={(e) => setUpi(e.target.value)} placeholder="name@upi" data-testid="settings-upi-input" /><button onClick={saveUpi} className="h-11 shrink-0 rounded-full bg-white px-5 text-sm font-extrabold text-[#3B25A8]" data-testid="settings-upi-save">Save</button></div>}
           {payments.length > 0 && <div className="divide-y divide-white/10">{payments.map((p) => <p key={p.id} className="flex justify-between py-1.5"><span className="flex items-center gap-1.5"><Receipt className="h-3.5 w-3.5" />{p.description}{p.mode === "test" ? " (test)" : ""}</span><b>{inr(p.amount)}</b></p>)}</div>}
         </Item>

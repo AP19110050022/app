@@ -467,8 +467,8 @@ async def config():
 
 
 class TrackIn(BaseModel):
-    session_id: str = Field(min_length=6, max_length=64)
-    page: str = Field(min_length=1, max_length=60)
+    session_id: str = Field(min_length=6, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    page: str = Field(min_length=1, max_length=40, pattern=r"^(Landing|Sign in|Sign up|Discover|Search|Creator profile|Business profile|Chat room|Chat list|Deals|Jobs|Saved|Notifications|Upgrade to Pro|My profile|Settings|My posts|(Creator|Business) setup · Step [1-3])$")
 
 
 @api.post("/track")
@@ -479,7 +479,7 @@ async def track(body: TrackIn):
 
 @api.post("/creators/{creator_id}/view")
 async def view_creator(creator_id: str, member: dict = Depends(current_member)):
-    if creator_id == member["user_id"]:
+    if creator_id == member["user_id"] or not await db.creators.find_one({"user_id": creator_id}, {"_id": 1}):
         return {"ok": True}
     r = await db.profile_views.update_one({"creator_id": creator_id, "viewer_id": member["user_id"], "day": iso()[:10]},
                                           {"$setOnInsert": {"at": iso()}}, upsert=True)
@@ -1296,7 +1296,7 @@ async def admin_remove_post(body: PostRemoveIn, admin: dict = Depends(admin_dep)
 # ---------- admin: deals & payouts ----------
 @api.get("/admin/deals")
 async def admin_deals(_: dict = Depends(admin_dep)):
-    deals = await db.deals.find({}, {"_id": 0, "history": 0}).sort("updated_at", -1).to_list(500)
+    deals = await db.deals.find({"status": {"$ne": "chat"}}, {"_id": 0, "history": 0}).sort("updated_at", -1).to_list(500)
     outs = {p["deal_id"]: p for p in await db.payouts.find({"deal_id": {"$in": [d["id"] for d in deals]}}, {"_id": 0}).to_list(1000)}
     for d in deals:
         d["payout"] = outs.get(d["id"])

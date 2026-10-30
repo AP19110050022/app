@@ -31,7 +31,7 @@ export default function Upgrade() {
           {me.is_pro && <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3.5 py-1.5 text-sm font-bold" data-testid="pro-active-badge"><Check className="h-4 w-4" />Active until {new Date(me.user.pro_until).toLocaleDateString()}</p>}
           <div className="mt-5">
             {me.business ? (
-              <PayButton body={{ kind: "pro" }} label={me.is_pro ? `Extend 30 days · ${inr(price)}` : `Upgrade · ${inr(price)}`} className="h-[52px] w-full bg-white text-base text-[#3B25A8]" testid="upgrade-pay-button" onPaid={() => navigate("/app/profile")} />
+              <PayButton body={{ kind: "pro" }} label={me.is_pro ? `Extend ${config?.pro_days ?? 30} days · ${inr(price)}` : `Upgrade · ${inr(price)}`} className="h-[52px] w-full bg-white text-base text-[#3B25A8]" testid="upgrade-pay-button" onPaid={() => navigate("/app/profile")} />
             ) : (
               <Link to="/app/setup/business?next=/app/upgrade" className="flex h-[52px] items-center justify-center gap-2 rounded-full bg-white font-extrabold text-[#3B25A8]" data-testid="upgrade-setup-business"><Store className="h-4 w-4" />Create a business profile first</Link>
             )}

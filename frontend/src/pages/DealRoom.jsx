@@ -122,6 +122,7 @@ const ChatOffer = ({ deal, reload }) => {
 };
 
 const Composer = ({ deal, onSend }) => {
+  const { config } = useMe();
   const [t, setT] = useState("");
   if (["declined", "cancelled"].includes(deal.status)) return <p className="p-4 text-center text-sm text-white/50">This deal is closed.</p>;
   if (!deal.chat_open) {
@@ -129,7 +130,7 @@ const Composer = ({ deal, onSend }) => {
       <div className="flex flex-col items-center gap-2 p-4 text-center" data-testid="chat-locked">
         <Lock className="h-5 w-5" />
         <p className="text-[13px] text-white/80">{deal.is_business ? "You've used your free creator contacts. Upgrade to Business Pro to chat." : "Chat opens once the business upgrades to Business Pro."}</p>
-        {deal.is_business && <Link to="/app/upgrade"><Btn tone="cta" testid="chat-upgrade-button"><Crown className="h-4 w-4" />Upgrade · {inr(999)}/mo</Btn></Link>}
+        {deal.is_business && <Link to="/app/upgrade"><Btn tone="cta" testid="chat-upgrade-button"><Crown className="h-4 w-4" />Upgrade · {inr(config?.pro_price ?? 999)}/{config?.pro_days ?? 30} days</Btn></Link>}
       </div>
     );
   }
@@ -170,7 +171,7 @@ export default function DealRoom() {
   if (missing) return <div className="py-20 text-center" data-testid="deal-not-found"><p className="font-bold">Deal not found</p><Link to="/app/chat" className="text-white/70 underline">Back to chats</Link></div>;
   if (!deal) return <div className="grid place-items-center py-20"><Loader2 className="h-7 w-7 animate-spin" /></div>;
   const other = deal.is_business ? { name: deal.creator_name, img: deal.creator_photo, link: `/app/creator/${deal.creator_id}` } : { name: deal.business_name, img: deal.business_logo };
-  const paid = ["paid", "delivered", "completed"].includes(deal.status);
+  const paid = ["paid", "delivered", "completed", "disputed", "refunded"].includes(deal.status);
 
   return (
     <div className="mx-auto max-w-2xl" data-testid="deal-room-page">
