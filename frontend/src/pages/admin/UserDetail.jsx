@@ -39,7 +39,7 @@ export default function UserDetail() {
           : <Btn danger onClick={() => setDlg(true)} testid="user-block-button"><Ban className="h-4 w-4" />Block</Btn>)}
       </div>
       {d.creator && <Section title="Creator profile">
-        <Box><Row><img src={d.creator.photo} alt="" className="h-12 w-12 rounded-2xl object-cover" /><div className="min-w-0 flex-1"><p className="font-bold">{d.creator.name}</p><p className="text-xs text-white/65">{d.creator.categories?.join(" · ")} · {d.creator.city} · {d.creator.samples?.length || 0} posts</p></div><Pill s={d.creator.status} />{d.creator.live === false && <Pill s="offline" />}</Row></Box>
+        <Box><Row><img src={d.creator.photo} alt="" className="h-12 w-12 rounded-2xl object-cover" /><div className="min-w-0 flex-1"><p className="font-bold">{d.creator.name}</p><p className="text-xs text-white/65">{d.creator.categories?.join(" · ")} · {d.creator.city} · {d.creator.samples?.length || 0} posts</p></div><Pill s={d.creator.blocked ? "blocked" : d.creator.status} label={d.creator.blocked ? "Hidden (blocked)" : undefined} />{d.creator.live === false && <Pill s="offline" />}</Row></Box>
       </Section>}
       {d.business && <Section title="Business profile">
         <Box><Row><Avatar src={d.business.logo} name={d.business.company} /><div className="min-w-0 flex-1"><p className="font-bold">{d.business.company}</p><p className="text-xs text-white/65">{d.business.industry} · {d.business.city}</p></div>{d.business.removed && <Pill s="removed" />}</Row></Box>

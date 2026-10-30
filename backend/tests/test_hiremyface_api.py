@@ -67,7 +67,7 @@ class TestAuth:
         assert r.status_code == 200 and r.json()["user"]["email"] == "brand+clerk_test@example.com"
 
     def test_member_admin_403_and_admin_200(self, tok):
-        for p in ["/admin/stats", "/admin/creators", "/admin/deals", "/admin/payments", "/users"]:
+        for p in ["/admin/stats", "/admin/creators", "/admin/deals", "/admin/users", "/admin/reports"]:
             assert requests.get(f"{API}{p}", headers=H(tok["brand"])).status_code == 403, p
             assert requests.get(f"{API}{p}", headers=H(tok["admin"])).status_code == 200, p
 
@@ -183,14 +183,11 @@ class TestDealFlow:
 
     def test_deliver_release_rate(self, tok):
         assert requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "mark_delivered"}, headers=H(tok["brand"])).status_code == 400
-        assert requests.post(f"{API}/admin/deals/{ST['deal']}/release", headers=H(tok["admin"])).status_code == 400
         r = requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "submit_work", "link": "https://instagram.com/p/test"}, headers=H(tok["creator"]))
         assert r.status_code == 200 and r.json()["delivery_link"]
         r = requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "mark_delivered"}, headers=H(tok["brand"]))
-        assert r.status_code == 200 and r.json()["status"] == "delivered" and r.json()["payout_status"] == "ready"
-        assert requests.post(f"{API}/admin/deals/{ST['deal']}/release", headers=H(tok["brand"])).status_code == 403
-        r = requests.post(f"{API}/admin/deals/{ST['deal']}/release", headers=H(tok["admin"]))
-        assert r.status_code == 200 and r.json()["payout"] == 2340
+        # iter3: payout is auto-released on mark_delivered (creator saved a payout UPI earlier)
+        assert r.status_code == 200 and r.json()["status"] == "completed" and r.json()["payout_amount"] == 2340
         d = requests.get(f"{API}/deals/{ST['deal']}", headers=H(tok["brand"])).json()
         assert d["status"] == "completed" and d["payout_status"] == "released"
         r = requests.post(f"{API}/deals/{ST['deal']}/rate", json={"stars": 5, "review": "TEST_ great"}, headers=H(tok["brand"]))
@@ -202,7 +199,7 @@ class TestDealFlow:
 
     def test_admin_stats(self, tok):
         s = requests.get(f"{API}/admin/stats", headers=H(tok["admin"])).json()
-        assert s["gmv"] >= 2600 and s["revenue"] >= 999 + 260
+        assert s["paid_by_businesses"] >= 2600 and s["platform_earnings"] >= 999 + 260
 
 
 # --- notifications

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Crown } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,9 @@ export const Avatar = ({ src, name }) => src
 
 export default function AdminUsers() {
   const navigate = useNavigate();
+  const [text, setText] = useState("");
   const [q, setQ] = useState("");
+  useEffect(() => { const t = setTimeout(() => setQ(text), 350); return () => clearTimeout(t); }, [text]);
   const [f, setF] = useState({ role: "", status: "", pro: "" });
   const [list] = useAdminData("/admin/users", { q, ...f });
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
@@ -27,7 +29,7 @@ export default function AdminUsers() {
       <H1 sub="Everyone on HireMyFace">Users</H1>
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email" className="rounded-full pl-10" data-testid="users-search-input" /></div>
+          <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Search name or email" className="rounded-full pl-10" data-testid="users-search-input" /></div>
         <Filter value={f.role} onChange={set("role")} testid="users-filter-role" items={[["all", "All roles"], ["creator", "Creators"], ["business", "Businesses"], ["both", "Both"], ["none", "No profile"]]} />
         <Filter value={f.status} onChange={set("status")} testid="users-filter-status" items={[["all", "Any status"], ["active", "Active"], ["blocked", "Blocked"]]} />
         <Filter value={f.pro} onChange={set("pro")} testid="users-filter-pro" items={[["all", "Pro or not"], ["yes", "Pro only"]]} />

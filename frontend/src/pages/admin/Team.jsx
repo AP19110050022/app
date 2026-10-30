@@ -2,18 +2,24 @@ import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { UserPlus, Trash2, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import { useMe } from "@/context/MeContext";
+import { errMsg } from "@/lib/api";
 import { Avatar } from "@/pages/admin/Users";
 import { Box, Btn, H1, Nothing, Pill, ReasonDialog, Row, Spinner, useAdminData, useAdminRun, when } from "@/pages/admin/bits";
 
 export default function Team() {
-  const { me } = useMe();
+  const { me, api } = useMe();
   const [d, reload] = useAdminData(me.user.role === "owner" ? "/admin/team" : "/admin/log");
   const run = useAdminRun(reload);
   const [email, setEmail] = useState("");
   const [rm, setRm] = useState(null);
   if (me.user.role !== "owner") return <Navigate to="/admin" replace />;
-  const add = async (e) => { e.preventDefault(); if (await run("post", "/admin/team", { email }, "Admin added")) setEmail(""); };
+  const add = async (e) => {
+    e.preventDefault();
+    try { const r = await api.post("/admin/team", { email }); toast.success(r.data.result === "added" ? "Admin added" : "Invite saved. They become admin when they sign up."); setEmail(""); reload(); } catch (er) { toast.error(errMsg(er)); }
+  };
+  const isInvite = d?.invites?.some((i) => i.email === rm);
   return (
     <div className="max-w-3xl" data-testid="admin-team">
       <H1 sub="Helper admins can do everything except manage the team and block admins">Admin team</H1>
@@ -45,7 +51,7 @@ export default function Team() {
       </>)}
       <ReasonDialog open={!!rm} onOpenChange={(o) => !o && setRm(null)} danger noReason cta="Remove" testid="team-remove-dialog"
         title="Remove this admin?" text={`${rm} loses access to the admin panel right away.`}
-        onConfirm={() => run("delete", `/admin/team/${encodeURIComponent(rm)}`, undefined, "Admin removed")} />
+        onConfirm={() => run("delete", `/admin/team/${encodeURIComponent(rm)}`, undefined, isInvite ? "Invite cancelled" : "Admin removed")} />
     </div>
   );
 }

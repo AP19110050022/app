@@ -27,7 +27,11 @@ One account, + chooser (creator 3 steps / business 2 steps); 3 plans Per Video /
 - Iteration 3 (zip parity): plans shown on tiles; Sort (not price band) in filters; multi-category creators; creators offer 1–3 plans; photo uploads as posts (/app/posts, max 12); zip-style Profile (hero, metrics, Live/Offline for creator & business, tools rows); Settings page (notification prefs, payouts, privacy, help, terms, logout/delete); businesses multi-plan + description; Jobs: businesses post jobs, only open jobs of live businesses show in Discover "Jobs by businesses"; creators "I'm interested"; business manages interests (shortlist/decline/send offer); business public profile. Offline creators can't get new offers. iteration_2: backend 47/47, frontend all flows passed.
 - Razorpay: user skipped keys → payments still MOCKED test mode.
 
+- Iteration 4 (Admin panel, /admin): owner = OWNER_EMAIL (ganeshreddypittu111@gmail.com), helper admins added by email (or invite consumed at sign-up). Dashboard (today/7d/30d/all, money, needs-attention), creator approvals with rejection reason, users search/filters/detail, block/unblock (403 account_blocked + Clerk session revoke, content hidden, deals paused), jobs/posts removal, deals & payouts (auto payout on business approval, failed→retry/auto-retry on UPI save), reports (creator/business/job/deal) & disputes (release/refund), team (owner only), activity log. Payouts/refunds TEST MODE (MOCKED). iteration_3: backend 18/19 → fixed (admin chat impersonation), frontend all flows passed.
+
 ## Backlog
+- P2 (admin): growth charts, spreadsheet export, broadcast announcements, verified-badge control
+- P3 (admin): finer helper roles, auto-flagging, daily admin email summary
 - P0: Add Razorpay keys (payments currently MOCKED test mode); set ADMIN_EMAIL.
 - P1: Phone OTP login, automatic payouts (Razorpay Route), email alerts, calendar date picker in offer dialog.
 - P2: Featured boost, AI matching, PDF contracts/invoices, mobile apps, multi-currency.

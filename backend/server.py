@@ -44,7 +44,7 @@ FEE_PCT = 10
 FREE_OFFER_LIMIT = 2
 PLANS = ("per_video", "part_time", "full_time")
 PlanT = Literal["per_video", "part_time", "full_time"]
-PAID_STATES = ("paid", "delivered", "completed")
+PAID_STATES = ("paid", "delivered", "completed", "disputed", "refunded")
 
 
 def now() -> datetime:
@@ -817,7 +817,9 @@ async def deal_action(deal_id: str, body: DealAction, member: dict = Depends(cur
     if new_status:
         upd["status"] = new_status
         ops["$push"] = {"history": {"status": new_status, "at": iso()}}
-    await db.deals.update_one({"id": deal_id}, ops)
+    r = await db.deals.update_one({"id": deal_id, "status": st}, ops)
+    if not r.matched_count:
+        raise HTTPException(409, "This deal just changed. Refresh and try again.")
     if msg_to:
         await notify(msg_to, "deal", msg, f"/app/chat/{deal_id}")
     if a == "dispute":
@@ -867,6 +869,8 @@ async def send_message(deal_id: str, body: MessageIn, member: dict = Depends(cur
     if deal.get("paused"):
         raise HTTPException(400, "This deal is paused while our team reviews an account")
     is_b = deal["business_id"] == member["user_id"]
+    if not is_b and deal["creator_id"] != member["user_id"]:
+        raise HTTPException(403, "Only the business and the creator can post in this chat")
     msg = {"id": new_id(), "deal_id": deal_id, "sender_id": member["user_id"],
            "sender_name": deal["business_name"] if is_b else deal["creator_name"], "text": body.text.strip(), "created_at": iso()}
     await db.messages.insert_one({**msg})
@@ -944,7 +948,7 @@ async def my_payments(member: dict = Depends(current_member)):
 
 
 # ---------- admin ----------
-admin_dep = require_role("admin")
+admin_dep = require_role("owner", "admin")
 
 
 owner_dep = require_role("owner")
@@ -986,7 +990,7 @@ async def release_payout(deal_id: str) -> dict:
 
 
 async def refund_deal(deal: dict):
-    await db.deals.update_one({"id": deal["id"]}, {"$set": {"status": "refunded", "payout_status": "refunded", "updated_at": iso()},
+    await db.deals.update_one({"id": deal["id"]}, {"$set": {"status": "refunded", "payout_status": "refunded", "updated_at": iso()}, "$unset": {"paused": ""},
                                                   "$push": {"history": {"status": "refunded", "at": iso()}}})
     await db.payments.update_one({"deal_id": deal["id"], "status": "paid"}, {"$set": {"refund_status": "refunded", "refund_mode": "test", "refunded_at": iso()}})
 
@@ -1046,7 +1050,7 @@ async def admin_stats(range: Literal["today", "7d", "30d", "all"] = "all", _: di
     count = lambda col, q: db[col].count_documents(q)  # noqa: E731
     return {
         "users": await count("users", {**IN_ENV, **win("created_at")}),
-        "creators_live": await count("creators", {"status": "approved", **real, **win("created_at")}),
+        "creators_live": await count("creators", {"status": "approved", "live": {"$ne": False}, **HIDE, **real, **win("created_at")}),
         "creators_pending": await count("creators", {"status": "pending", **win("created_at")}),
         "creators_rejected": await count("creators", {"status": "rejected", **win("created_at")}),
         "businesses": await count("businesses", win("created_at")),
@@ -1280,7 +1284,7 @@ async def admin_resolve(report_id: str, body: ResolveIn, admin: dict = Depends(a
         if not deal:
             raise HTTPException(400, "This deal is no longer in dispute")
         if a == "release":
-            await db.deals.update_one({"id": tid}, {"$set": {"status": "delivered", "payout_status": "pending"}})
+            await db.deals.update_one({"id": tid}, {"$set": {"status": "delivered", "payout_status": "pending"}, "$unset": {"paused": ""}})
             await release_payout(tid)
         else:
             await refund_deal(deal)

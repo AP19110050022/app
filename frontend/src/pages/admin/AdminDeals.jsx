@@ -16,7 +16,7 @@ export default function AdminDeals() {
   return (
     <div data-testid="admin-deals">
       <H1 sub="Payouts go out automatically when the business approves the work">Deals & payouts</H1>
-      <div className="no-scrollbar mb-4 overflow-x-auto"><div className="min-w-[520px] max-w-2xl"><Seg value={f} onChange={setF} testid="deals-filter" options={[["all", "All"], ["active", "Active"], ["disputed", "Disputed"], ["failed", "Failed payouts"], ["completed", "Completed"]]} /></div></div>
+      <div className="no-scrollbar -mx-4 mb-4 overflow-x-auto px-4"><div className="w-[560px] max-w-none sm:w-auto sm:max-w-2xl"><Seg value={f} onChange={setF} testid="deals-filter" options={[["all", "All"], ["active", "Active"], ["disputed", "Disputed"], ["failed", "Failed payouts"], ["completed", "Completed"]]} /></div></div>
       {!deals ? <Spinner /> : (
         <Box testid="admin-deals-list">
           {list.length === 0 ? <Nothing t="No deals here" /> : list.map((d) => (
