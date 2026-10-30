@@ -1,3 +1,4 @@
+import { ReportButton } from "@/components/ReportButton";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { Users, Store, MapPin, ChevronDown, Loader2, SearchX, Clock, Plus, Search, Bookmark } from "lucide-react";
@@ -78,6 +79,7 @@ export const BusinessCard = ({ b, i, onOpen, saved, onToggleSave }) => (
 export const JobCard = ({ j, i = 0, onInterest, mine }) => (
   <div className="rise card-shadow relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#6C4CF1] to-[#3B25A8] p-4" style={{ animationDelay: `${i * 60}ms` }} data-testid={`job-card-${j.id}`}>
     <span className="absolute -right-12 -top-12 h-[190px] w-[190px] rounded-full border-[26px] border-white/15" />
+    {!mine && <div className="absolute right-3 top-3 z-10"><ReportButton type="job" id={j.id} label="Report" testid={`job-report-${j.id}`} className="inline-flex items-center gap-1 rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-bold text-white/80 hover:bg-black/30" /></div>}
     <Link to={`/app/business/${j.business_id}`} className="relative flex items-center gap-3" data-testid={`job-business-link-${j.id}`}>
       <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white text-lg font-extrabold text-[#6C4CF1]">{j.logo ? <img src={j.logo} alt="" className="h-full w-full object-cover" /> : j.company[0]}</span>
       <div className="min-w-0"><p className="truncate text-[13px] font-bold">{j.company}</p><p className="truncate text-xs text-white/80">{j.city}{j.distance_km != null ? ` · ${Math.round(j.distance_km)} km` : ""}</p></div>

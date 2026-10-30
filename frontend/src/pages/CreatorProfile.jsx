@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bookmark, Grid3x3, Tag, Info, Star, Play, MessageSquare, Instagram, Youtube, Check, Pencil, Loader2, ExternalLink, MapPin, Languages } from "lucide-react";
 import { toast } from "sonner";
 import { OfferDialog } from "@/components/OfferDialog";
+import { ReportButton } from "@/components/ReportButton";
 import { PLANS } from "@/constants/options";
 import { useMe } from "@/context/MeContext";
 import { inr } from "@/lib/api";
@@ -114,6 +115,7 @@ export default function CreatorProfile() {
         <p className="text-[14px] text-white/80">{(c.categories || [c.category]).join(" · ")} presenter{c.followers ? ` · ${c.followers >= 1000 ? `${Math.round(c.followers / 1000)}k` : c.followers} followers` : ""}</p>
         {c.bio && <p className="mt-1 line-clamp-2 text-[14px]">{c.bio}</p>}
         <p className="text-[14px] text-white/70">{c.city} · {c.languages.join(", ")}</p>
+        {!own && <div className="mt-1"><ReportButton type="creator" id={c.user_id} label="Report profile" testid="creator-report-button" /></div>}
         <div className="no-scrollbar mt-4 flex gap-4 overflow-x-auto pb-1">
           {PLANS.filter((p) => c[p.rate]).map((p) => (
             <button key={p.id} onClick={() => (own ? setTab("prices") : setOfferPlan(p.id))} className="flex shrink-0 flex-col items-center gap-1.5" data-testid={`highlight-${p.id}`}>

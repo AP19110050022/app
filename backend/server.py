@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.cors import CORSMiddleware
 
@@ -59,7 +60,10 @@ def new_id() -> str:
 
 
 # ---------- roles (code-defined) ----------
-ROLES = ["admin", "member"]
+ROLES = ["owner", "admin", "member"]
+ADMIN_ROLES = ("owner", "admin")
+HIDE = {"blocked": {"$ne": True}, "removed": {"$ne": True}}
+ACTIVE_DEALS = ["pending", "countered", "accepted", "paid", "delivered", "disputed"]
 DEFAULT_ROLE = "member"
 RETIRED_ROLES = {}
 RANK = {r: len(ROLES) - i for i, r in enumerate(ROLES)}
@@ -79,14 +83,28 @@ def _clerk_user(user_id: str) -> dict:
     return r.json()
 
 
+def _clerk_headers() -> dict:
+    return {"Authorization": f"Bearer {os.environ['CLERK_SECRET_KEY']}", "User-Agent": "emergent-app"}
+
+
+def _revoke_sessions(user_id: str):
+    r = requests.get("https://api.clerk.com/v1/sessions", params={"user_id": user_id, "status": "active"}, headers=_clerk_headers(), timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    for s in (data.get("data", []) if isinstance(data, dict) else data):
+        requests.post(f"https://api.clerk.com/v1/sessions/{s['id']}/revoke", headers=_clerk_headers(), timeout=10)
+
+
 def _profile_from_clerk(data: dict) -> dict:
-    admins = {e.strip().lower() for e in os.environ.get("ADMIN_EMAIL", "").split(",") if e.strip()}
+    owner = os.environ.get("OWNER_EMAIL", "").strip().lower()
     emails = data.get("email_addresses") or []
-    is_admin = any(e["email_address"].lower() in admins and (e.get("verification") or {}).get("status") == "verified" for e in emails)
+    verified = [e["email_address"].lower() for e in emails if (e.get("verification") or {}).get("status") == "verified"]
+    is_admin = bool(owner) and owner in verified
     primary = next((e["email_address"] for e in emails if e.get("id") == data.get("primary_email_address_id")),
                    emails[0]["email_address"] if emails else "")
     name = " ".join(x for x in [data.get("first_name"), data.get("last_name")] if x) or primary.split("@")[0]
-    return {"role": "admin" if is_admin else DEFAULT_ROLE, "email": primary, "name": name, "image_url": data.get("image_url", "")}
+    return {"role": "owner" if is_admin else DEFAULT_ROLE, "email": primary, "name": name, "image_url": data.get("image_url", ""),
+            "verified": verified}
 
 
 async def current_member(user: dict = Depends(require_user)) -> dict:
@@ -94,12 +112,17 @@ async def current_member(user: dict = Depends(require_user)) -> dict:
     member = await db.users.find_one({"user_id": uid}, {"_id": 0})
     if member is None or not member.get("role"):
         prof = _profile_from_clerk(await run_in_threadpool(_clerk_user, uid))
+        verified = prof.pop("verified")
+        if prof["role"] == DEFAULT_ROLE and verified and await db.admin_invites.find_one_and_delete({"email": {"$in": verified}}):
+            prof["role"] = "admin"
         await db.users.update_one({"user_id": uid, "role": {"$in": [None, ""]}}, {"$set": {"role": prof["role"]}})
         member = await db.users.find_one_and_update(
             {"user_id": uid},
             {"$setOnInsert": {"user_id": uid, "active_mode": None, "pro_until": None, "payout_upi": "",
                               "created_at": iso(), **prof}},
             upsert=True, projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if member.get("blocked"):
+        raise HTTPException(status_code=403, detail="account_blocked")
     if member.get("env") != ENV:
         await db.users.update_one({"user_id": uid}, {"$set": {"env": ENV}})
     return {**member, "env": ENV, "role": effective_role(member["role"])}
@@ -217,9 +240,10 @@ class OfferIn(BaseModel):
 
 
 class DealAction(BaseModel):
-    action: Literal["accept", "decline", "counter", "accept_counter", "cancel", "submit_work", "mark_delivered"]
+    action: Literal["accept", "decline", "counter", "accept_counter", "cancel", "submit_work", "mark_delivered", "dispute"]
     price: Optional[int] = Field(None, ge=100, le=10_000_000)
     link: Optional[str] = Field(None, max_length=500)
+    note: Optional[str] = Field(None, max_length=1000)
 
 
 class MessageIn(BaseModel):
@@ -243,12 +267,36 @@ class VerifyIn(BaseModel):
     razorpay_signature: Optional[str] = None
 
 
-class CreatorStatusIn(BaseModel):
-    status: Literal["approved", "hidden", "pending"]
+class ReportIn(BaseModel):
+    target_type: Literal["creator", "business", "job", "deal"]
+    target_id: str = Field(min_length=1, max_length=80)
+    reason: Literal["fake_profile", "inappropriate", "scam", "no_show", "other"]
+    note: str = Field("", max_length=500)
 
 
-class RoleIn(BaseModel):
-    role: str
+class ReasonIn(BaseModel):
+    reason: str = Field(min_length=3, max_length=300)
+
+
+class CreatorReviewIn(BaseModel):
+    status: Literal["approved", "rejected"]
+    reason: str = Field("", max_length=300)
+
+
+class PostRemoveIn(BaseModel):
+    creator_id: str
+    index: int = Field(ge=0, le=11)
+    prefix: str = Field(max_length=80)
+    reason: str = Field(min_length=3, max_length=300)
+
+
+class ResolveIn(BaseModel):
+    action: Literal["dismiss", "warn", "remove", "block", "release", "refund"]
+    note: str = Field(min_length=3, max_length=500)
+
+
+class TeamIn(BaseModel):
+    email: str = Field(min_length=5, max_length=120, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 # ---------- helpers ----------
@@ -279,7 +327,7 @@ def public_creator(c: dict) -> dict:
 
 
 async def get_deal_for(deal_id: str, member: dict) -> dict:
-    scope = {} if member["role"] == "admin" else {"$or": [{"business_id": member["user_id"]}, {"creator_id": member["user_id"]}]}
+    scope = {} if member["role"] in ADMIN_ROLES else {"$or": [{"business_id": member["user_id"]}, {"creator_id": member["user_id"]}]}
     deal = await db.deals.find_one({"id": deal_id, **scope}, {"_id": 0})
     if not deal:
         raise HTTPException(404, "Deal not found")
@@ -404,7 +452,7 @@ async def config():
 async def list_creators(q: str = "", category: str = "", city: str = "", state: str = "", lat: Optional[float] = None,
                         lng: Optional[float] = None, radius_km: int = 0, language: str = "", plan: str = "",
                         gender: str = "", min_price: int = 0, max_price: int = 0, sort: str = "recommended", limit: int = 60):
-    query = {"status": "approved", "live": {"$ne": False}}
+    query = {"status": "approved", "live": {"$ne": False}, **HIDE}
     if q:
         rx = {"$regex": re.escape(q), "$options": "i"}
         query["$or"] = [{"name": rx}, {"city": rx}, {"state": rx}, {"categories": rx}, {"bio": rx}]
@@ -428,7 +476,7 @@ async def list_creators(q: str = "", category: str = "", city: str = "", state: 
 
 @api.get("/creators/{creator_id}")
 async def get_creator(creator_id: str):
-    c = await db.creators.find_one({"user_id": creator_id, "status": "approved"}, {"_id": 0, "phone": 0, "loc": 0})
+    c = await db.creators.find_one({"user_id": creator_id, "status": "approved", **HIDE}, {"_id": 0, "phone": 0, "loc": 0})
     if not c:
         raise HTTPException(404, "Creator not found")
     reviews = await db.deals.find({"creator_id": creator_id, "rating": {"$ne": None}},
@@ -459,6 +507,9 @@ async def update_me(body: MeUpdate, member: dict = Depends(current_member)):
         raise HTTPException(400, "Create your business profile first")
     if upd:
         await db.users.update_one({"user_id": member["user_id"]}, {"$set": upd})
+    if upd.get("payout_upi"):
+        async for p in db.payouts.find({"creator_id": member["user_id"], "status": "failed"}, {"_id": 0, "deal_id": 1}):
+            await release_payout(p["deal_id"])
     return {"ok": True}
 
 
@@ -545,7 +596,8 @@ async def create_job(body: JobIn, member: dict = Depends(current_member)):
 
 @api.put("/jobs/{job_id}")
 async def update_job(job_id: str, body: JobIn, member: dict = Depends(current_member)):
-    r = await db.jobs.update_one({"id": job_id, "business_id": member["user_id"]}, {"$set": {**body.model_dump(), "updated_at": iso()}})
+    r = await db.jobs.update_one({"id": job_id, "business_id": member["user_id"], "status": {"$ne": "removed"}},
+                                 {"$set": {**body.model_dump(), "updated_at": iso()}})
     if not r.matched_count:
         raise HTTPException(404, "Job not found")
     return await db.jobs.find_one({"id": job_id}, JOB_PUBLIC)
@@ -572,8 +624,8 @@ async def my_jobs(member: dict = Depends(current_member)):
 @api.get("/jobs")
 async def list_jobs(state: str = "", city: str = "", lat: Optional[float] = None, lng: Optional[float] = None,
                     radius_km: int = 0, plan: str = "", member: dict = Depends(current_member)):
-    live_biz = [b["user_id"] for b in await db.businesses.find({"live": {"$ne": False}}, {"user_id": 1}).to_list(5000)]
-    query = {"status": "open", "business_id": {"$in": live_biz}}
+    live_biz = [b["user_id"] for b in await db.businesses.find({"live": {"$ne": False}, **HIDE}, {"user_id": 1}).to_list(5000)]
+    query = {"status": "open", "business_id": {"$in": live_biz}, "blocked": {"$ne": True}}
     if plan in RATE_FIELD:
         query["plans"] = plan
     apply_location(query, state, city, lat, lng, radius_km)
@@ -587,7 +639,7 @@ async def list_jobs(state: str = "", city: str = "", lat: Optional[float] = None
 @api.get("/businesses/{biz_id}")
 async def business_profile(biz_id: str, member: dict = Depends(current_member)):
     b = await db.businesses.find_one({"user_id": biz_id}, {"_id": 0, "phone": 0, "loc": 0})
-    if not b:
+    if not b or ((b.get("blocked") or b.get("removed")) and biz_id != member["user_id"]):
         raise HTTPException(404, "Business not found")
     hidden = b.get("live") is False and biz_id != member["user_id"]
     jobs = [] if hidden else await db.jobs.find({"business_id": biz_id, "status": "open"}, JOB_PUBLIC).sort("created_at", -1).to_list(50)
@@ -604,7 +656,7 @@ async def show_interest(job_id: str, body: InterestIn, member: dict = Depends(cu
         raise HTTPException(404, "This job is no longer open")
     if job["business_id"] == member["user_id"]:
         raise HTTPException(400, "This is your own job")
-    if not await db.businesses.find_one({"user_id": job["business_id"], "live": {"$ne": False}}):
+    if not await db.businesses.find_one({"user_id": job["business_id"], "live": {"$ne": False}, **HIDE}):
         raise HTTPException(404, "This job is no longer open")
     doc = {"id": new_id(), "job_id": job_id, "job_title": job["title"], "business_id": job["business_id"], "company": job["company"],
            "creator_id": c["user_id"], "creator_name": c["name"], "creator_photo": c["photo"], "from_price": c.get("from_price"),
@@ -635,7 +687,7 @@ async def set_interest(interest_id: str, body: InterestStatusIn, member: dict = 
 @api.get("/businesses")
 async def list_businesses(state: str = "", city: str = "", lat: Optional[float] = None, lng: Optional[float] = None,
                           radius_km: int = 0, _: dict = Depends(current_member)):
-    query = {}
+    query = dict(HIDE)
     apply_location(query, state, city, lat, lng, radius_km)
     docs = await db.businesses.find(query, {"_id": 0, "phone": 0}).sort("created_at", -1).to_list(200)
     return add_distance(docs, lat, lng, radius_km > 0)
@@ -646,8 +698,8 @@ async def list_saved(member: dict = Depends(current_member)):
     rows = await db.saved.find({"user_id": member["user_id"]}, {"_id": 0}).to_list(500)
     cids = [s["creator_id"] for s in rows if s.get("kind", "creator") == "creator"]
     bids = [s["creator_id"] for s in rows if s.get("kind") == "business"]
-    return {"creators": await db.creators.find({"user_id": {"$in": cids}, "status": "approved"}, {"_id": 0, "phone": 0, "samples": 0}).to_list(500),
-            "businesses": await db.businesses.find({"user_id": {"$in": bids}}, {"_id": 0, "phone": 0}).to_list(500)}
+    return {"creators": await db.creators.find({"user_id": {"$in": cids}, "status": "approved", **HIDE}, {"_id": 0, "phone": 0, "samples": 0}).to_list(500),
+            "businesses": await db.businesses.find({"user_id": {"$in": bids}, **HIDE}, {"_id": 0, "phone": 0}).to_list(500)}
 
 
 @api.get("/saved/ids")
@@ -678,7 +730,7 @@ async def create_deal(body: OfferIn, member: dict = Depends(current_member)):
     business = await db.businesses.find_one({"user_id": uid}, {"_id": 0})
     if not business:
         raise HTTPException(400, "Create your business profile first")
-    creator = await db.creators.find_one({"user_id": body.creator_id, "status": "approved"}, {"_id": 0})
+    creator = await db.creators.find_one({"user_id": body.creator_id, "status": "approved", **HIDE}, {"_id": 0})
     if not creator:
         raise HTTPException(404, "Creator not found")
     if body.creator_id == uid:
@@ -723,6 +775,8 @@ async def deal_action(deal_id: str, body: DealAction, member: dict = Depends(cur
     deal = await get_deal_for(deal_id, member)
     uid, a, st = member["user_id"], body.action, deal["status"]
     is_b, is_c = deal["business_id"] == uid, deal["creator_id"] == uid
+    if deal.get("paused"):
+        raise HTTPException(400, "This deal is paused while our team reviews an account")
     upd, new_status, msg_to, msg = {}, None, None, ""
     if a in ("accept", "decline", "counter") and is_c and st == "pending":
         if a == "counter":
@@ -749,8 +803,13 @@ async def deal_action(deal_id: str, body: DealAction, member: dict = Depends(cur
     elif a == "mark_delivered" and is_b and st == "paid":
         if not deal.get("delivery_link"):
             raise HTTPException(400, "The creator hasn't submitted the work yet")
-        new_status, upd["payout_status"], msg_to = "delivered", "ready", deal["creator_id"]
+        new_status, upd["payout_status"], msg_to = "delivered", "pending", deal["creator_id"]
         msg = f"{deal['business_name']} approved your work. Your payout is being released."
+    elif a == "dispute" and is_b and st == "paid":
+        if not (body.note or "").strip():
+            raise HTTPException(400, "Tell us what went wrong")
+        new_status, upd["payout_status"], msg_to = "disputed", "on_hold", deal["creator_id"]
+        msg = f"{deal['business_name']} raised a dispute. The payout is on hold while our team reviews it."
     else:
         raise HTTPException(400, "This action isn't available right now")
     upd["updated_at"] = iso()
@@ -761,6 +820,13 @@ async def deal_action(deal_id: str, body: DealAction, member: dict = Depends(cur
     await db.deals.update_one({"id": deal_id}, ops)
     if msg_to:
         await notify(msg_to, "deal", msg, f"/app/chat/{deal_id}")
+    if a == "dispute":
+        await db.reports.insert_one({"id": new_id(), "kind": "dispute", "status": "open", "reporter_id": uid,
+                                     "reporter_name": deal["business_name"], "target_type": "deal", "target_id": deal_id,
+                                     "target_user_id": deal["creator_id"], "target_label": f"{deal['business_name']} ↔ {deal['creator_name']}",
+                                     "reason": "dispute", "note": body.note.strip(), "created_at": iso()})
+    if a == "mark_delivered":
+        await release_payout(deal_id)
     return await db.deals.find_one({"id": deal_id}, {"_id": 0})
 
 
@@ -798,6 +864,8 @@ async def send_message(deal_id: str, body: MessageIn, member: dict = Depends(cur
         raise HTTPException(402, "Chat unlocks when the business upgrades to Business Pro")
     if deal["status"] in ("declined", "cancelled"):
         raise HTTPException(400, "This deal is closed")
+    if deal.get("paused"):
+        raise HTTPException(400, "This deal is paused while our team reviews an account")
     is_b = deal["business_id"] == member["user_id"]
     msg = {"id": new_id(), "deal_id": deal_id, "sender_id": member["user_id"],
            "sender_name": deal["business_name"] if is_b else deal["creator_name"], "text": body.text.strip(), "created_at": iso()}
@@ -879,88 +947,413 @@ async def my_payments(member: dict = Depends(current_member)):
 admin_dep = require_role("admin")
 
 
-@api.get("/admin/stats")
-async def admin_stats(_: dict = Depends(admin_dep)):
-    paid = await db.payments.find({"status": "paid"}, {"_id": 0, "amount": 1, "fee": 1, "kind": 1}).to_list(10000)
-    return {"users": await db.users.count_documents(IN_ENV),
-            "creators_live": await db.creators.count_documents({"status": "approved", "is_sample": {"$ne": True}}),
-            "creators_pending": await db.creators.count_documents({"status": "pending"}),
-            "businesses": await db.businesses.count_documents({}),
-            "deals": await db.deals.count_documents({}),
-            "payouts_ready": await db.deals.count_documents({"payout_status": "ready"}),
-            "gmv": sum(p["amount"] for p in paid if p["kind"] == "deal"),
-            "revenue": sum(p["fee"] for p in paid),
-            "pro_subs": await db.users.count_documents({"pro_until": {"$gt": iso()}})}
+owner_dep = require_role("owner")
 
 
-@api.get("/admin/creators")
-async def admin_creators(status: str = "", _: dict = Depends(admin_dep)):
-    q = {"status": status} if status else {}
-    return await db.creators.find(q, {"_id": 0, "samples": 0}).sort("created_at", -1).to_list(500)
+async def log_action(admin: dict, action: str, target: str, detail: str = ""):
+    await db.admin_log.insert_one({"id": new_id(), "admin_id": admin["user_id"], "admin_name": admin.get("name") or admin.get("email", ""),
+                                   "action": action, "target": target, "detail": detail, "at": iso()})
 
 
-@api.patch("/admin/creators/{creator_id}")
-async def admin_set_creator(creator_id: str, body: CreatorStatusIn, _: dict = Depends(admin_dep)):
-    r = await db.creators.update_one({"user_id": creator_id}, {"$set": {"status": body.status}})
-    if not r.matched_count:
-        raise HTTPException(404, "Not found")
-    text = {"approved": "Your creator profile is live! Businesses can now find you.",
-            "hidden": "Your creator profile was hidden by our team. Contact support for details.",
-            "pending": "Your creator profile is back under review."}[body.status]
-    await notify(creator_id, "approval", text, "/app/profile")
-    return {"ok": True}
-
-
-@api.get("/admin/deals")
-async def admin_deals(_: dict = Depends(admin_dep)):
-    return await db.deals.find({}, {"_id": 0}).sort("updated_at", -1).to_list(500)
-
-
-@api.post("/admin/deals/{deal_id}/release")
-async def admin_release(deal_id: str, _: dict = Depends(admin_dep)):
-    deal = await db.deals.find_one({"id": deal_id, "payout_status": "ready"}, {"_id": 0})
-    if not deal:
-        raise HTTPException(400, "No payout ready for this deal")
-    payout = deal["price"] - round(deal["price"] * FEE_PCT / 100)
-    await db.deals.update_one({"id": deal_id}, {"$set": {"status": "completed", "payout_status": "released", "payout_amount": payout,
+async def release_payout(deal_id: str) -> dict:
+    deal = await db.deals.find_one({"id": deal_id}, {"_id": 0})
+    payout = await db.payouts.find_one({"deal_id": deal_id}, {"_id": 0})
+    if payout and payout["status"] == "released":
+        return payout
+    amount = deal["price"] - round(deal["price"] * FEE_PCT / 100)
+    if not payout:
+        payout = {"id": new_id(), "deal_id": deal_id, "creator_id": deal["creator_id"], "creator_name": deal["creator_name"],
+                  "business_name": deal["business_name"], "amount": amount, "mode": "test", "status": "pending",
+                  "attempts": 0, "created_at": iso()}
+        await db.payouts.insert_one({**payout})
+    user = await db.users.find_one({"user_id": deal["creator_id"]}, {"_id": 0, "payout_upi": 1}) or {}
+    upi = (user.get("payout_upi") or "").strip()
+    attempt = {"attempts": payout.get("attempts", 0) + 1, "last_attempt_at": iso()}
+    if not upi and not deal["creator_id"].startswith("sample_"):
+        await db.payouts.update_one({"id": payout["id"]}, {"$set": {**attempt, "status": "failed", "error": "Creator has no payout UPI yet"}})
+        await db.deals.update_one({"id": deal_id}, {"$set": {"payout_status": "failed", "updated_at": iso()}})
+        await notify(deal["creator_id"], "payout", f"Add your payout UPI in Settings to receive ₹{amount:,} for '{deal['plan_label']}'.", "/app/settings")
+        return {**payout, "status": "failed"}
+    # Real transfers need RazorpayX; until then payouts are recorded in test mode (MOCKED).
+    await db.payouts.update_one({"id": payout["id"]}, {"$set": {**attempt, "status": "released", "upi": upi, "error": "", "released_at": iso()}})
+    await db.deals.update_one({"id": deal_id}, {"$set": {"status": "completed", "payout_status": "released", "payout_amount": amount,
                                                          "released_at": iso(), "updated_at": iso()},
                                                 "$push": {"history": {"status": "completed", "at": iso()}}})
     await db.creators.update_one({"user_id": deal["creator_id"]}, {"$inc": {"deals_done": 1}})
-    await notify(deal["creator_id"], "payout", f"Payout of ₹{payout:,} released to your payout account.", f"/app/chat/{deal_id}")
+    await notify(deal["creator_id"], "payout", f"Payout of ₹{amount:,} released to your payout account.", f"/app/chat/{deal_id}")
     await notify(deal["business_id"], "deal", f"Deal with {deal['creator_name']} is completed.", f"/app/chat/{deal_id}")
-    return {"ok": True, "payout": payout}
+    return {**payout, "status": "released"}
 
 
-@api.get("/admin/payments")
-async def admin_payments(_: dict = Depends(admin_dep)):
-    return await db.payments.find({"status": "paid"}, {"_id": 0}).sort("created_at", -1).to_list(500)
+async def refund_deal(deal: dict):
+    await db.deals.update_one({"id": deal["id"]}, {"$set": {"status": "refunded", "payout_status": "refunded", "updated_at": iso()},
+                                                  "$push": {"history": {"status": "refunded", "at": iso()}}})
+    await db.payments.update_one({"deal_id": deal["id"], "status": "paid"}, {"$set": {"refund_status": "refunded", "refund_mode": "test", "refunded_at": iso()}})
 
 
-@api.get("/users")
-async def list_users(admin: dict = Depends(admin_dep)):
-    people = await db.users.find(IN_ENV, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    return {"roles": [r for r in ROLES if RANK[r] <= RANK[admin["role"]]],
-            "users": [{**p, "role": effective_role(p.get("role")), "is_pro": is_pro(p)} for p in people]}
+def since_of(rng: str) -> Optional[str]:
+    if rng == "today":
+        return now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    if rng in ("7d", "30d"):
+        return (now() - timedelta(days=int(rng[:-1]))).isoformat()
+    return None
 
 
-@api.patch("/users/{user_id}/role")
-async def set_role(user_id: str, body: RoleIn, admin: dict = Depends(admin_dep)):
-    if body.role not in ROLES or RANK[body.role] > RANK[admin["role"]]:
-        raise HTTPException(status_code=403, detail="Not allowed")
+@api.post("/reports")
+async def file_report(body: ReportIn, member: dict = Depends(current_member)):
+    uid, t, tid = member["user_id"], body.target_type, body.target_id
+    target_user, label = None, ""
+    if t == "creator":
+        d = await db.creators.find_one({"user_id": tid}, {"_id": 0, "name": 1})
+        target_user, label = tid, d and d["name"]
+    elif t == "business":
+        d = await db.businesses.find_one({"user_id": tid}, {"_id": 0, "company": 1})
+        target_user, label = tid, d and d["company"]
+    elif t == "job":
+        d = await db.jobs.find_one({"id": tid}, {"_id": 0, "business_id": 1, "title": 1, "company": 1})
+        if d:
+            target_user, label = d["business_id"], f"{d['title']} · {d['company']}"
+    else:
+        d = await db.deals.find_one({"id": tid, "$or": [{"business_id": uid}, {"creator_id": uid}]}, {"_id": 0})
+        if d:
+            target_user = d["creator_id"] if d["business_id"] == uid else d["business_id"]
+            label = f"{d['business_name']} ↔ {d['creator_name']}"
+    if not d:
+        raise HTTPException(404, "Not found")
+    if target_user == uid:
+        raise HTTPException(400, "You can't report yourself")
+    rep = {"id": new_id(), "kind": "report", "status": "open", "reporter_id": uid, "reporter_name": member.get("name", ""),
+           "target_type": t, "target_id": tid, "target_user_id": target_user, "target_label": label,
+           "reason": body.reason, "note": body.note.strip(), "created_at": iso()}
+    try:
+        await db.reports.insert_one({**rep})
+    except DuplicateKeyError:
+        raise HTTPException(409, "You've already reported this")
+    return {"ok": True}
+
+
+# ---------- admin: dashboard & approvals ----------
+@api.get("/admin/stats")
+async def admin_stats(range: Literal["today", "7d", "30d", "all"] = "all", _: dict = Depends(admin_dep)):
+    s = since_of(range)
+
+    def win(field: str) -> dict:
+        return {field: {"$gte": s}} if s else {}
+    real = {"is_sample": {"$ne": True}}
+    pays = await db.payments.find({"status": "paid", **win("paid_at")}, {"_id": 0, "amount": 1, "fee": 1, "kind": 1, "refund_status": 1}).to_list(50000)
+    outs = await db.payouts.find({"status": "released", **win("released_at")}, {"_id": 0, "amount": 1}).to_list(50000)
+    kept = [p for p in pays if p.get("refund_status") != "refunded"]
+    count = lambda col, q: db[col].count_documents(q)  # noqa: E731
+    return {
+        "users": await count("users", {**IN_ENV, **win("created_at")}),
+        "creators_live": await count("creators", {"status": "approved", **real, **win("created_at")}),
+        "creators_pending": await count("creators", {"status": "pending", **win("created_at")}),
+        "creators_rejected": await count("creators", {"status": "rejected", **win("created_at")}),
+        "businesses": await count("businesses", win("created_at")),
+        "pro_subs": await count("users", {"pro_until": {"$gt": iso()}, **IN_ENV}),
+        "open_jobs": await count("jobs", {"status": "open", **win("created_at")}),
+        "active_deals": await count("deals", {"status": {"$in": ACTIVE_DEALS}, **win("created_at")}),
+        "completed_deals": await count("deals", {"status": "completed", **win("released_at")}),
+        "paid_by_businesses": sum(p["amount"] for p in kept),
+        "platform_earnings": sum(p["fee"] if p["kind"] == "deal" else p["amount"] for p in kept),
+        "paid_out": sum(p["amount"] for p in outs),
+        "attention": {"pending_creators": await count("creators", {"status": "pending"}),
+                      "open_reports": await count("reports", {"kind": "report", "status": "open"}),
+                      "disputes": await count("reports", {"kind": "dispute", "status": "open"}),
+                      "failed_payouts": await count("payouts", {"status": "failed"})},
+        "money_mode": "live" if rzp_client() else "test",
+    }
+
+
+@api.get("/admin/creators")
+async def admin_creators(status: Literal["pending", "approved", "rejected"] = "pending", _: dict = Depends(admin_dep)):
+    return await db.creators.find({"status": status, "is_sample": {"$ne": True}}, {"_id": 0, "loc": 0}).sort("updated_at", -1).to_list(300)
+
+
+@api.patch("/admin/creators/{creator_id}")
+async def admin_review_creator(creator_id: str, body: CreatorReviewIn, admin: dict = Depends(admin_dep)):
+    reason = body.reason.strip()
+    if body.status == "rejected" and len(reason) < 3:
+        raise HTTPException(400, "Add a short reason for the rejection")
+    c = await db.creators.find_one_and_update({"user_id": creator_id},
+                                              {"$set": {"status": body.status, "review_note": reason if body.status == "rejected" else "",
+                                                        "reviewed_at": iso()}}, projection={"_id": 0, "name": 1})
+    if not c:
+        raise HTTPException(404, "Not found")
+    text = "Your creator profile is live! Businesses can now find you." if body.status == "approved" else \
+        f"Your creator profile wasn't approved: {reason}. Edit your profile and it goes back for review."
+    await notify(creator_id, "approval", text, "/app/profile")
+    await log_action(admin, body.status, f"Creator {c['name']}", reason)
+    return {"ok": True}
+
+
+# ---------- admin: users ----------
+USER_FIELDS = ("user_id", "name", "email", "image_url", "role", "blocked", "block_reason", "created_at", "active_mode", "payout_upi")
+
+
+@api.get("/admin/users")
+async def admin_users(q: str = "", role: str = "", status: str = "", pro: str = "", _: dict = Depends(admin_dep)):
+    query = dict(IN_ENV)
+    if q:
+        rx = {"$regex": re.escape(q.strip()), "$options": "i"}
+        query["$or"] = [{"name": rx}, {"email": rx}]
+    if status == "blocked":
+        query["blocked"] = True
+    elif status == "active":
+        query["blocked"] = {"$ne": True}
+    if pro == "yes":
+        query["pro_until"] = {"$gt": iso()}
+    people = await db.users.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    ids = [p["user_id"] for p in people]
+    cids = {c["user_id"] for c in await db.creators.find({"user_id": {"$in": ids}}, {"user_id": 1}).to_list(1000)}
+    bids = {b["user_id"] for b in await db.businesses.find({"user_id": {"$in": ids}}, {"user_id": 1}).to_list(1000)}
+    out = []
+    for p in people:
+        kind = "both" if p["user_id"] in cids and p["user_id"] in bids else "creator" if p["user_id"] in cids else \
+            "business" if p["user_id"] in bids else "none"
+        if role and kind != role:
+            continue
+        out.append({**{k: p.get(k) for k in USER_FIELDS}, "role": effective_role(p.get("role")), "kind": kind, "is_pro": is_pro(p)})
+    return out
+
+
+@api.get("/admin/users/{user_id}")
+async def admin_user(user_id: str, _: dict = Depends(admin_dep)):
+    u = await db.users.find_one({"user_id": user_id, **IN_ENV}, {"_id": 0})
+    if not u:
+        raise HTTPException(404, "User not found")
+    either = {"$or": [{"business_id": user_id}, {"creator_id": user_id}]}
+    return {"user": {**{k: u.get(k) for k in USER_FIELDS}, "role": effective_role(u.get("role")), "is_pro": is_pro(u), "pro_until": u.get("pro_until")},
+            "creator": await db.creators.find_one({"user_id": user_id}, {"_id": 0, "loc": 0}),
+            "business": await db.businesses.find_one({"user_id": user_id}, {"_id": 0, "loc": 0}),
+            "jobs": await db.jobs.find({"business_id": user_id}, JOB_PUBLIC).sort("created_at", -1).to_list(100),
+            "deals": await db.deals.find(either, {"_id": 0, "history": 0}).sort("updated_at", -1).to_list(100),
+            "reports": await db.reports.find({"target_user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(100),
+            "payments": await db.payments.find({"user_id": user_id, "status": "paid"}, {"_id": 0}).sort("created_at", -1).to_list(100),
+            "payouts": await db.payouts.find({"creator_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(100)}
+
+
+async def set_blocked(admin: dict, user_id: str, blocked: bool, reason: str):
     target = await db.users.find_one({"user_id": user_id, **IN_ENV}, {"_id": 0})
-    if target is None:
-        raise HTTPException(status_code=404, detail="Not found")
-    if (effective_role(target.get("role")) == "admin" and body.role != "admin"
-            and await db.users.count_documents({"role": "admin", **IN_ENV}) <= 1):
-        raise HTTPException(status_code=409, detail="Keep at least one admin")
-    await db.users.update_one({"user_id": user_id}, {"$set": {"role": body.role}})
-    return {"user_id": user_id, "role": body.role}
+    if not target:
+        raise HTTPException(404, "User not found")
+    if user_id == admin["user_id"]:
+        raise HTTPException(400, "You can't block yourself")
+    t_role = effective_role(target.get("role"))
+    if t_role == "owner":
+        raise HTTPException(403, "The main admin can't be blocked")
+    if t_role == "admin" and admin["role"] != "owner":
+        raise HTTPException(403, "Only the main admin can block another admin")
+    flag = {"$set": {"blocked": True}} if blocked else {"$unset": {"blocked": ""}}
+    await db.users.update_one({"user_id": user_id}, {"$set": {"blocked": True, "block_reason": reason, "blocked_at": iso(), "blocked_by": admin["user_id"]}}
+                              if blocked else {"$unset": {"blocked": "", "block_reason": "", "blocked_at": "", "blocked_by": ""}})
+    await db.creators.update_many({"user_id": user_id}, flag)
+    await db.businesses.update_many({"user_id": user_id}, flag)
+    await db.jobs.update_many({"business_id": user_id}, flag)
+    either = {"$or": [{"business_id": user_id}, {"creator_id": user_id}]}
+    if blocked:
+        await db.deals.update_many({**either, "status": {"$in": ACTIVE_DEALS}}, {"$set": {"paused": True}})
+        try:
+            await run_in_threadpool(_revoke_sessions, user_id)
+        except Exception as e:  # the per-request blocked check still locks them out
+            logger.warning("session revoke failed for %s: %s", user_id, e)
+    else:
+        await db.deals.update_many({**either, "paused": True}, {"$unset": {"paused": ""}})
+        await notify(user_id, "approval", "Your account has been restored. Welcome back!", "/app")
+    await log_action(admin, "blocked" if blocked else "unblocked", f"User {target.get('name') or target.get('email')}", reason)
+
+
+@api.post("/admin/users/{user_id}/block")
+async def admin_block(user_id: str, body: ReasonIn, admin: dict = Depends(admin_dep)):
+    await set_blocked(admin, user_id, True, body.reason.strip())
+    return {"ok": True}
+
+
+@api.post("/admin/users/{user_id}/unblock")
+async def admin_unblock(user_id: str, body: ReasonIn, admin: dict = Depends(admin_dep)):
+    await set_blocked(admin, user_id, False, body.reason.strip())
+    return {"ok": True}
+
+
+# ---------- admin: content ----------
+@api.get("/admin/jobs")
+async def admin_jobs(_: dict = Depends(admin_dep)):
+    return await db.jobs.find({}, JOB_PUBLIC).sort("created_at", -1).to_list(500)
+
+
+@api.post("/admin/jobs/{job_id}/remove")
+async def admin_remove_job(job_id: str, body: ReasonIn, admin: dict = Depends(admin_dep)):
+    job = await db.jobs.find_one_and_update({"id": job_id}, {"$set": {"status": "removed", "removed_reason": body.reason.strip(), "updated_at": iso()}},
+                                            projection={"_id": 0})
+    if not job:
+        raise HTTPException(404, "Job not found")
+    await notify(job["business_id"], "approval", f"Your job '{job['title']}' was removed by our team: {body.reason.strip()}", "/app/jobs")
+    await log_action(admin, "removed", f"Job {job['title']}", body.reason.strip())
+    return {"ok": True}
+
+
+@api.get("/admin/posts")
+async def admin_posts(_: dict = Depends(admin_dep)):
+    out = []
+    async for c in db.creators.find({"is_sample": {"$ne": True}, "samples.0": {"$exists": True}}, {"_id": 0, "user_id": 1, "name": 1, "photo": 1, "samples": 1}):
+        out += [{"creator_id": c["user_id"], "creator_name": c["name"], "creator_photo": c["photo"], "index": i, "post": p, "prefix": p[:60]}
+                for i, p in enumerate(c["samples"])]
+    return out[:400]
+
+
+@api.post("/admin/posts/remove")
+async def admin_remove_post(body: PostRemoveIn, admin: dict = Depends(admin_dep)):
+    c = await db.creators.find_one({"user_id": body.creator_id}, {"_id": 0, "name": 1, "samples": 1})
+    posts = (c or {}).get("samples") or []
+    if body.index >= len(posts) or not posts[body.index].startswith(body.prefix):
+        raise HTTPException(409, "This post changed. Refresh and try again.")
+    posts.pop(body.index)
+    await db.creators.update_one({"user_id": body.creator_id}, {"$set": {"samples": posts}})
+    await notify(body.creator_id, "approval", f"One of your posts was removed by our team: {body.reason.strip()}", "/app/posts")
+    await log_action(admin, "removed", f"Post by {c['name']}", body.reason.strip())
+    return {"ok": True}
+
+
+# ---------- admin: deals & payouts ----------
+@api.get("/admin/deals")
+async def admin_deals(_: dict = Depends(admin_dep)):
+    deals = await db.deals.find({}, {"_id": 0, "history": 0}).sort("updated_at", -1).to_list(500)
+    outs = {p["deal_id"]: p for p in await db.payouts.find({"deal_id": {"$in": [d["id"] for d in deals]}}, {"_id": 0}).to_list(1000)}
+    for d in deals:
+        d["payout"] = outs.get(d["id"])
+    return deals
+
+
+@api.post("/admin/deals/{deal_id}/retry-payout")
+async def admin_retry_payout(deal_id: str, admin: dict = Depends(admin_dep)):
+    if not await db.payouts.find_one({"deal_id": deal_id, "status": "failed"}):
+        raise HTTPException(400, "No failed payout for this deal")
+    p = await release_payout(deal_id)
+    await log_action(admin, "retried payout", f"Payout to {p['creator_name']}", p["status"])
+    if p["status"] != "released":
+        raise HTTPException(400, "Payout failed again: the creator still has no payout UPI")
+    return {"ok": True}
+
+
+# ---------- admin: reports & disputes ----------
+@api.get("/admin/reports")
+async def admin_reports(status: Literal["open", "resolved"] = "open", kind: str = "", _: dict = Depends(admin_dep)):
+    q = {"status": status, **({"kind": kind} if kind else {})}
+    return await db.reports.find(q, {"_id": 0}).sort("created_at", -1).to_list(300)
+
+
+@api.get("/admin/reports/{report_id}")
+async def admin_report(report_id: str, _: dict = Depends(admin_dep)):
+    r = await db.reports.find_one({"id": report_id}, {"_id": 0})
+    if not r:
+        raise HTTPException(404, "Report not found")
+    t, tid = r["target_type"], r["target_id"]
+    target = await (db.creators.find_one({"user_id": tid}, {"_id": 0, "loc": 0}) if t == "creator" else
+                    db.businesses.find_one({"user_id": tid}, {"_id": 0, "loc": 0}) if t == "business" else
+                    db.jobs.find_one({"id": tid}, JOB_PUBLIC) if t == "job" else db.deals.find_one({"id": tid}, {"_id": 0}))
+    msgs = await db.messages.find({"deal_id": tid}, {"_id": 0}).sort("created_at", 1).to_list(500) if t == "deal" else []
+    user = await db.users.find_one({"user_id": r["target_user_id"]}, {"_id": 0, **{k: 1 for k in USER_FIELDS}})
+    return {**r, "target": target, "messages": msgs, "target_user": user}
+
+
+@api.post("/admin/reports/{report_id}/resolve")
+async def admin_resolve(report_id: str, body: ResolveIn, admin: dict = Depends(admin_dep)):
+    r = await db.reports.find_one({"id": report_id, "status": "open"}, {"_id": 0})
+    if not r:
+        raise HTTPException(404, "This report is already closed")
+    a, note, t, tid = body.action, body.note.strip(), r["target_type"], r["target_id"]
+    if (r["kind"] == "dispute") != (a in ("release", "refund")):
+        raise HTTPException(400, "Disputes end with release or refund; reports with dismiss, warn, remove or block")
+    if a == "remove":
+        if t == "deal":
+            raise HTTPException(400, "A deal chat can't be removed. Warn or block the user instead.")
+        if t == "creator":
+            await db.creators.update_one({"user_id": tid}, {"$set": {"status": "rejected", "review_note": note}})
+        elif t == "business":
+            await db.businesses.update_one({"user_id": tid}, {"$set": {"removed": True}})
+        else:
+            await db.jobs.update_one({"id": tid}, {"$set": {"status": "removed", "removed_reason": note}})
+    elif a == "block":
+        await set_blocked(admin, r["target_user_id"], True, note)
+    elif a in ("release", "refund"):
+        deal = await db.deals.find_one({"id": tid, "status": "disputed"}, {"_id": 0})
+        if not deal:
+            raise HTTPException(400, "This deal is no longer in dispute")
+        if a == "release":
+            await db.deals.update_one({"id": tid}, {"$set": {"status": "delivered", "payout_status": "pending"}})
+            await release_payout(tid)
+        else:
+            await refund_deal(deal)
+    await db.reports.update_one({"id": report_id}, {"$set": {"status": "resolved", "resolution": {"action": a, "note": note, "by": admin.get("name", ""), "at": iso()}}})
+    outcome = {"dismiss": "no action was needed", "warn": "the user was warned", "remove": "the content was removed",
+               "block": "the account was blocked", "release": "the payout was released to the creator",
+               "refund": "the payment was refunded to the business"}[a]
+    await notify(r["reporter_id"], "approval", f"We reviewed your {'dispute' if r['kind'] == 'dispute' else 'report'} on {r['target_label']}: {outcome}.", "/app/notifications")
+    if a != "dismiss" and a != "block":
+        await notify(r["target_user_id"], "approval", f"HireMyFace team: {note}" if a == "warn" else f"Our team reviewed {r['target_label']}: {outcome}. {note}", "/app/notifications")
+    await log_action(admin, f"resolved ({a})", r["target_label"], note)
+    return {"ok": True}
+
+
+# ---------- admin: team & log ----------
+@api.get("/admin/team")
+async def admin_team(_: dict = Depends(owner_dep)):
+    admins = await db.users.find({"role": {"$in": list(ADMIN_ROLES)}, **IN_ENV}, {"_id": 0, "user_id": 1, "name": 1, "email": 1, "role": 1, "image_url": 1}).to_list(100)
+    invites = await db.admin_invites.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"admins": admins, "invites": invites}
+
+
+@api.post("/admin/team")
+async def admin_add(body: TeamIn, admin: dict = Depends(owner_dep)):
+    email = body.email.strip().lower()
+    user = await db.users.find_one({"email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}, **IN_ENV}, {"_id": 0})
+    if user:
+        if effective_role(user.get("role")) in ADMIN_ROLES:
+            raise HTTPException(400, "This person is already an admin")
+        if user.get("blocked"):
+            raise HTTPException(400, "Unblock this account first")
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"role": "admin"}})
+        await notify(user["user_id"], "approval", "You're now a HireMyFace admin. Open the Admin panel from the menu.", "/admin")
+        result = "added"
+    else:
+        await db.admin_invites.update_one({"email": email}, {"$setOnInsert": {"email": email, "invited_by": admin["user_id"], "created_at": iso()}}, upsert=True)
+        result = "invited"
+    await log_action(admin, "added admin" if result == "added" else "invited admin", email)
+    return {"ok": True, "result": result}
+
+
+@api.delete("/admin/team/{email}")
+async def admin_remove(email: str, admin: dict = Depends(owner_dep)):
+    email = email.strip().lower()
+    rx = {"$regex": f"^{re.escape(email)}$", "$options": "i"}
+    r = await db.users.update_many({"email": rx, "role": "admin", **IN_ENV}, {"$set": {"role": DEFAULT_ROLE}})
+    i = await db.admin_invites.delete_one({"email": email})
+    if not r.modified_count and not i.deleted_count:
+        raise HTTPException(404, "No helper admin with that email")
+    await log_action(admin, "removed admin", email)
+    return {"ok": True}
+
+
+@api.get("/admin/log")
+async def admin_activity(_: dict = Depends(admin_dep)):
+    return await db.admin_log.find({}, {"_id": 0}).sort("at", -1).to_list(300)
 
 
 @app.on_event("startup")
 async def startup():
     for old, new in RETIRED_ROLES.items():
         await db.users.update_many({"role": old}, {"$set": {"role": new}})
+    owner = os.environ.get("OWNER_EMAIL", "").strip().lower()
+    if owner:
+        owner_rx = {"$regex": f"^{re.escape(owner)}$", "$options": "i"}
+        await db.users.update_many({"role": "owner", "email": {"$not": owner_rx}}, {"$set": {"role": "admin"}})
+        await db.users.update_many({"email": owner_rx}, {"$set": {"role": "owner"}, "$unset": {"blocked": ""}})
+    await db.creators.update_many({"status": "hidden"}, {"$set": {"status": "rejected"}})
+    await db.reports.create_index([("reporter_id", 1), ("target_type", 1), ("target_id", 1), ("kind", 1)], unique=True)
+    await db.payouts.create_index("deal_id", unique=True)
+    await db.admin_invites.create_index("email", unique=True)
+    async for d in db.deals.find({"payout_status": "ready"}, {"_id": 0, "id": 1}):
+        await release_payout(d["id"])
     if not await db.creators.find_one({"is_sample": True}):
         await db.creators.insert_many(sample_creator_docs())
     await db.creators.update_many({"is_sample": True}, {"$set": {"rating_avg": 0, "rating_count": 0, "deals_done": 0}})

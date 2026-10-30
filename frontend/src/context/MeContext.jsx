@@ -8,13 +8,15 @@ export function MeProvider({ children }) {
   const [me, setMe] = useState(null);
   const [config, setConfig] = useState(null);
   const [error, setError] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const { data } = await api.get("/me");
       setMe(data);
       setError(false);
-    } catch {
+    } catch (e) {
+      if (e?.response?.data?.detail === "account_blocked") setBlocked(true);
       setError(true);
     }
   }, [api]);
@@ -29,7 +31,7 @@ export function MeProvider({ children }) {
     return () => clearInterval(t);
   }, [refresh]);
 
-  return <MeCtx.Provider value={{ me, config, refresh, api, error }}>{children}</MeCtx.Provider>;
+  return <MeCtx.Provider value={{ me, config, refresh, api, error, blocked }}>{children}</MeCtx.Provider>;
 }
 
 export const useMe = () => useContext(MeCtx);

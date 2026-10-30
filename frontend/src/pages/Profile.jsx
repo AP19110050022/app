@@ -31,7 +31,7 @@ export const VisibilityCard = ({ kind, live, onToggle, pending }) => (
   </section>
 );
 
-const STATUS = { pending: [Clock, "Under review"], approved: [BadgeCheck, "Approved"], hidden: [EyeOff, "Hidden by team"] };
+const STATUS = { pending: [Clock, "Under review"], approved: [BadgeCheck, "Approved"], hidden: [EyeOff, "Not approved"], rejected: [EyeOff, "Not approved"] };
 
 export default function Profile() {
   const { me, api, refresh } = useMe();
@@ -85,7 +85,7 @@ export default function Profile() {
           <Link to={isC ? `/app/creator/${p.user_id}` : `/app/business/${p.user_id}`} className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-extrabold text-[#3B25A8]" data-testid="profile-preview-button"><User className="h-4 w-4" />Preview profile</Link>
           <Link to={`/app/setup/${mode}`} className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-white/15 text-sm font-bold" data-testid="profile-edit-button"><Pencil className="h-4 w-4" />Edit profile</Link>
         </div>
-        {status && p.status !== "approved" && <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-200" data-testid="creator-status-pill"><StatusIcon className="h-3.5 w-3.5" />{status[1]}. Your profile shows in Discover once approved.</p>}
+        {status && p.status !== "approved" && <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-200" data-testid="creator-status-pill"><StatusIcon className="h-3.5 w-3.5" />{p.status === "rejected" ? `${status[1]}: ${p.review_note || "see notifications"}. Edit your profile to send it for review again.` : `${status[1]}. Your profile shows in Discover once approved.`}</p>}
       </section>
       <VisibilityCard kind={mode} live={p.live !== false} pending={isC && p.status !== "approved"} onToggle={() => toggle(mode, p.live === false)} />
       {isC ? (
@@ -108,7 +108,7 @@ export default function Profile() {
           : <ToolRow to={`/app/setup/${other}`} icon={Plus} title={`Also create a ${other} profile`} sub={other === "creator" ? "Get hired as a presenter" : "Hire presenters for your brand"} testid="profile-create-other" />}
         <ToolRow to="/app/saved" icon={Bookmark} title="Saved" sub="Creators and businesses you saved" testid="profile-link-saved" />
         <ToolRow to="/app/settings" icon={Settings} title="Settings & support" sub="Notifications, payments, privacy, help" testid="profile-settings-link" />
-        {me.user.role === "admin" && <ToolRow to="/app/admin" icon={ShieldCheck} title="Admin panel" testid="profile-link-admin" />}
+        {["owner", "admin"].includes(me.user.role) && <ToolRow to="/admin" icon={ShieldCheck} title="Admin panel" testid="profile-link-admin" />}
       </Panel>
       <p className="text-center text-xs text-white/50">{me.user.email}</p>
     </div>

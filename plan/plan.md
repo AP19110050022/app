@@ -1,114 +1,82 @@
-# HireMyFace — Rebuild Plan
+# HireMyFace — Admin Panel
 
-A marketplace where businesses hire creators and presenters to be the face of their brand on social media.
-Everyone signs up the same way, then picks a role (Creator or Business) from a "+" button on the home screen. Businesses send offers, chat and pay inside the app.
+A private control room for running HireMyFace: approve creators, keep the platform safe, follow deals and money, and see how the business is doing.
+It has one main admin (the owner), who can add helper admins and remove them.
 
 ## Who it's for
-- **Creators / presenters**: people who want paid work fronting brands in reels, shorts, ads and live sessions.
-- **Businesses**: shops, startups, agencies and brands in India that need a face for their social media.
-- **Admin (you)**: approves profiles, watches payments, releases creator payouts and handles disputes.
+- **Main admin (owner):** full control, including adding and removing helper admins.
+- **Helper admins:** run daily moderation and support. They cannot add or remove admins, and they cannot block the main admin.
+- **Regular users** (creators and businesses) never see the admin panel. They only see the new "Report" option.
 
 ## Core features and experience
-**Login (styled like Instagram / LinkedIn)**
-- Continue with Google, or email + password (with forgot password and email verification).
-- Mobile number (OTP) login is not in phase 1. Phone number is collected on the profile instead.
 
-**One account, choose your role with "+"**
-- Everyone lands on the same home feed after sign-up.
-- The "+" button opens: "Become a Creator" or "Hire as a Business". One account can hold both and switch between them.
+**1. Dashboard (home of the admin panel)**
+- Number cards: total users, creators (live / pending / rejected), businesses, Pro subscribers, open jobs, active deals, completed deals.
+- Money: total paid by businesses, platform earnings (10% service fee plus Pro subscriptions), and paid out to creators.
+- Each number can be shown for today, the last 7 days, the last 30 days or all time.
+- "Needs attention" counters: creators waiting for approval, open reports, deals in dispute. Tapping one opens that list.
 
-**Creator profile setup (short 3-step form)**
-1. Basics: photo, name, city, languages, category (Fashion, Food, Tech, Fitness, Beauty, Education, Real estate, Other).
-2. Showcase: intro video link, up to 6 sample photos/video links, social handles and follower counts.
-3. Rates: the three plans below. The creator sets their own prices.
+**2. Creator approvals**
+- A queue of new and edited creator profiles showing photo, categories, plans and prices, posts and location.
+- Approve or Reject. Rejecting needs a short reason, which the creator sees in a notification and on their profile.
+- Only approved creators appear in Discover (already the rule, kept as is).
 
-**The three plans (same everywhere in the app)**
-| Plan | What the business gets | How the price works |
-|---|---|---|
-| Per Video | One finished video (reel/short/ad), 1 revision | "From ₹X per video", set by the creator |
-| Part-time | Up to 8 videos a month + 1 live/shoot day | Monthly price set by the creator |
-| Full-time | Dedicated brand face, up to 20 videos a month, exclusive in their category | Monthly price set by the creator |
+**3. Users**
+- Search by name or email. Filter by role (creator / business / both), status (active / blocked) and Pro.
+- Open any user to see their profile, jobs, deals, reports against them and payment history.
+- Block or Unblock with a reason. A blocked user is signed out, can't log in, and their profile, jobs and posts disappear everywhere. Their ongoing deals are paused.
 
-**Business profile setup (short 2-step form)**
-1. Company name, logo, industry, city, website/Instagram.
-2. What they usually need: plan type, budget range, languages.
+**4. Jobs and posts moderation**
+- A list of all jobs posted by businesses, plus creator posts (photos and reels).
+- Remove any job or post with a reason. The owner gets a notification.
 
-**Discover and filter**
-- Home feed of creator cards (photo, name, city, category, "From ₹X", rating).
-- One simple filter sheet: Category, City, Language, Plan, Price range, Gender. Sort by: Recommended, Price low→high, Newest.
-- Save creators to a shortlist.
+**5. Deals and payouts**
+- A list of all deals with business, creator, plan, amount, status and payment state.
+- **Payouts are released automatically:** once the business marks the work as approved, the creator's payout (amount minus the 10% fee) is released at once, with no admin step.
+- Admins can still see each payout and its status (pending, released, failed) and retry a failed one.
+- Disputed deals pause automatic payout until an admin resolves them.
 
-**Offers**
-- A business picks a creator and a plan, adds a short brief, date and price (pre-filled from the creator's rate), then sends the offer.
-- The creator can accept, decline or send a counter-price.
-- Tracked under "My Deals": Pending → Accepted → Paid → Delivered → Completed.
+**6. Reports and disputes**
+- Users get a "Report" button on creator profiles, business profiles, jobs and deal chats, with a reason (fake profile, inappropriate content, scam, no-show, other) and an optional note.
+- On a paid deal, the business can "Raise a dispute" instead of approving the work.
+- Admins see open reports and disputes. They can read the deal chat, then resolve with one of these actions:
+  - dismiss
+  - warn the user
+  - remove the content
+  - block the user
+  - for disputes only: release the payout to the creator, or mark it refunded to the business
+- Both sides are notified of the outcome.
 
-**Chat**
-- In-app chat opens once an offer is sent.
-- Phone numbers, emails and outside links typed in chat are hidden until the deal is paid, so people can't skip the app before paying.
-
-**Payments (Razorpay, ₹ INR)**
-- The business pays the agreed amount into the app via Razorpay (UPI, cards, netbanking).
-- The money is held until the business marks the work as delivered. Admin then releases the payout to the creator.
-- The platform keeps a 10% service fee from each deal.
-
-**How the app makes money**
-- **Business subscription**:
-  - Free: browse, filter, shortlist, 2 offers a month, no chat.
-  - **Business Pro — ₹999/month**: unlimited offers, chat, in-app payments, "Verified business" badge.
-  - Free businesses must upgrade to Pro before they can chat or pay.
-- **10% service fee** on every paid deal.
-- Creators join free, which keeps the supply of creators growing.
-
-**Other screens**
-- Notifications (new offer, reply, payment, message).
-- Profile and settings: edit profile, switch role, subscription, payout details (UPI ID / bank), log out, delete account.
-- Ratings: after a deal is completed, the business rates the creator and the rating shows on the creator's card.
-- Admin panel: users, approve or hide profiles, deals, payments, release payouts, subscriptions.
-- Public landing page that explains the app, the plans and pricing, with Sign up / Log in buttons.
+**7. Admin team (main admin only)**
+- Add a helper admin by email. That person must already have a HireMyFace account; if not, they become admin as soon as they sign up with that email.
+- Remove a helper admin at any time.
+- An activity log of who did what and when (approved, blocked, removed, resolved, released), visible to all admins.
 
 ## User flow
-1. A visitor opens the landing page and taps Sign up, then uses Google or email.
-2. They land on the home feed of creators and tap "+".
-3. **Creator path**: fill in the 3-step profile and go live after admin approval. They then receive offers, chat, deliver the work and get paid.
-4. **Business path**: fill in the 2-step profile, filter creators, open a profile and send an offer. The business upgrades to Pro to chat and pay. It then pays in the app, marks the work delivered and rates the creator.
-5. The admin releases the payout to the creator.
+1. The main admin logs in and sees an "Admin" entry in the menu (hidden for everyone else).
+2. They land on the Dashboard, check the "Needs attention" counters, and tap into a queue.
+3. Creator approvals: review, then approve or reject with a reason.
+4. Reports: open one, review the content and chat, then take an action. The users are notified.
+5. Deals: follow payments. Payouts go out on their own when businesses approve the work; admins step in only on disputes or failed payouts.
+6. Admin team: the main admin adds a helper by email. The helper then sees the Admin menu, without the Team section.
 
 ## UI/UX feel
-- Violet, blue and purple brand colours, with clean white cards and bold, modern type.
-- Mobile-first, app-like layout: bottom navigation (Home, Search, +, Deals, Chat, Profile) on phones, side navigation on desktop.
-- Login and sign-up pages look like Instagram or LinkedIn: a centred card with the logo, "Continue with Google" and email fields. On desktop a side panel shows creator imagery.
-- Lively icons, smooth hover and tap animations, and clear status badges on deals.
-- The old confusing screens and names are replaced by the single flow above.
+- Same dark violet/blue social-app style as the rest of HireMyFace, but laid out for work: a side menu on desktop, tabs at the bottom on mobile.
+- Clear coloured status pills (pending, approved, rejected, blocked, disputed, released).
+- Every destructive action (block, remove, reject, refund) asks for confirmation and a reason.
+- Works fully on phone.
 
 ## Implementation phases
-**Phase 1 — MVP (built now)**
-- Landing page, Google + email login, the "+" role chooser, creator and business profile forms.
-- Home feed, filters, shortlist, creator profile page.
-- Offers with accept/decline/counter, the deal tracker, in-app chat with contact hiding.
-- Razorpay payments for deals and the Business Pro subscription (test mode), 10% fee, payouts held and released by admin.
-- Ratings, notifications, settings, admin panel. Ready to publish as a website.
-
-**Phase 2**
-- Mobile number OTP login.
-- Automatic payouts to creators.
-- "Featured creator" paid boost.
-- Email alerts for offers and messages.
-
-**Phase 3**
-- International payments and currencies.
-- Phone apps for Android and iOS.
-- AI matching of creators to briefs.
-- Contracts and invoices as PDFs.
+- **Phase 1 — MVP (built now):** everything above, including the dashboard, creator approvals, users with block/unblock, jobs and posts removal, the deals list with automatic payout on business approval, reports and disputes, the admin team with main admin and helpers, and the activity log.
+- **Phase 2:** charts of growth over time, exporting lists to a spreadsheet, broadcast announcements to all users, and verified-badge control.
+- **Phase 3:** finer helper roles (for example "moderator only" or "payments only"), automatic flagging of suspicious profiles, and an email summary to admins each day.
 
 ## Assumptions
-- The existing project zip is used as a reference for names and content only. The app is rebuilt from scratch with the new structure.
-- Phone login is moved to phase 2 because the chosen login system supports Google and email only. Phone OTP needs a separate SMS provider.
-- The monetisation model is: Business Pro at ₹999/month, plus a 10% fee per deal, with creators free. The prices are placeholders you can change.
-- Part-time means up to 8 videos a month and Full-time means up to 20 videos a month with category exclusivity. These limits are defaults you can edit.
-- Creators set their own prices for all three plans.
-- Payouts to creators are released by the admin in phase 1 and become automatic in phase 2.
-- Razorpay test keys are requested securely at build time. Until they are added, payments run in test mode only.
-- During the build you'll be asked for the email address that should be the first admin.
-- New creator profiles need admin approval before they appear in search.
-- The app is in English only and the currency is ₹ INR.
+- No email was given, so the **main admin will be the first account that logs in after this update**. This can be changed to a specific email at any time.
+- Helper admins can do everything except manage the admin team and block admins.
+- Blocking hides all of the user's content and pauses their deals. Nothing is deleted, so unblocking restores everything.
+- Payouts go out automatically when the business approves the work. A raised dispute stops this until an admin decides.
+- Real money movement (payouts and refunds) depends on Razorpay keys. Until they are added, payouts and refunds are recorded in test mode (MOCKED) and shown as such in the panel.
+- Reports can be filed by any logged-in user. One user can report the same item only once.
+- Money figures are in INR. Platform earnings are the 10% fee on paid deals plus ₹999/month Pro subscriptions.
+- The existing admin features (creator approval, deals and payout view) are folded into this new panel, not kept separately.

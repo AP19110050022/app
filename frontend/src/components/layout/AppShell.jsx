@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
-import { Compass, Plus, Briefcase, MessageCircle, User, Bell, Search, Loader2, Bookmark } from "lucide-react";
+import { useClerk } from "@clerk/react";
+import { Compass, Plus, Briefcase, MessageCircle, User, Bell, Search, Loader2, Bookmark, ShieldCheck, Ban } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { RoleChooser } from "@/components/RoleChooser";
 import { useMe } from "@/context/MeContext";
@@ -30,6 +31,7 @@ export const TopBar = ({ me }) => (
         )}
       </div>
       <div className="flex items-center gap-2">
+        {["owner", "admin"].includes(me?.user?.role) && <IconBtn to="/admin" icon={ShieldCheck} testid="top-admin-link" label="Admin" />}
         <IconBtn to="/app/search" icon={Search} testid="top-search-link" label="Search" />
         <IconBtn to="/app/saved" icon={Bookmark} testid="top-saved-link" label="Saved" />
         <IconBtn to="/app/notifications" icon={Bell} badge={me?.unread_notifications} testid="top-notifications-link" label="Notifications" />
@@ -58,11 +60,27 @@ const BottomNav = ({ onPlus }) => (
   </nav>
 );
 
+export const BlockedScreen = () => {
+  const { signOut } = useClerk();
+  useEffect(() => { const t = setTimeout(() => signOut({ redirectUrl: "/" }), 6000); return () => clearTimeout(t); }, [signOut]);
+  return (
+    <div className="grid min-h-screen place-items-center px-6 text-center text-white" data-testid="account-blocked-screen">
+      <div className="glass max-w-sm rounded-[28px] p-8">
+        <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-rose-500/30"><Ban className="h-7 w-7" /></span>
+        <p className="mt-4 text-xl font-extrabold">Your account is blocked</p>
+        <p className="mt-1 text-sm text-white/75">Our team blocked this account for breaking the HireMyFace rules. You're being signed out.</p>
+        <button onClick={() => signOut({ redirectUrl: "/" })} className="mt-5 h-11 rounded-full bg-white px-6 text-sm font-extrabold text-[#3B25A8]" data-testid="blocked-signout-button">Sign out</button>
+      </div>
+    </div>
+  );
+};
+
 export default function AppShell() {
-  const { me, error } = useMe();
+  const { me, error, blocked } = useMe();
   const [plus, setPlus] = useState(false);
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  if (blocked) return <BlockedScreen />;
   if (!me) {
     return (
       <div className="grid min-h-screen place-items-center text-white" data-testid="app-loading">

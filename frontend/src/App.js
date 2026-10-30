@@ -18,7 +18,16 @@ import Notifications from "@/pages/Notifications";
 import Saved from "@/pages/Saved";
 import Upgrade from "@/pages/Upgrade";
 import Profile from "@/pages/Profile";
-import Admin from "@/pages/Admin";
+import AdminShell from "@/pages/admin/AdminShell";
+import AdminDashboard from "@/pages/admin/Dashboard";
+import Approvals from "@/pages/admin/Approvals";
+import AdminUsers from "@/pages/admin/Users";
+import UserDetail from "@/pages/admin/UserDetail";
+import Content from "@/pages/admin/Content";
+import AdminDeals from "@/pages/admin/AdminDeals";
+import Reports from "@/pages/admin/Reports";
+import Team from "@/pages/admin/Team";
+import Activity from "@/pages/admin/Activity";
 import SettingsPage from "@/pages/Settings";
 import Posts from "@/pages/Posts";
 import Jobs from "@/pages/Jobs";
@@ -28,6 +37,13 @@ const Protected = () => (
   <>
     <Show when="signed-in"><MeProvider><AppShell /></MeProvider></Show>
     <Show when="signed-out"><Navigate to="/" replace /></Show>
+  </>
+);
+
+const ProtectedAdmin = () => (
+  <>
+    <Show when="signed-in"><MeProvider><AdminShell /></MeProvider></Show>
+    <Show when="signed-out"><Navigate to="/sign-in" replace /></Show>
   </>
 );
 
@@ -52,11 +68,22 @@ function App() {
             <Route path="saved" element={<Saved />} />
             <Route path="upgrade" element={<Upgrade />} />
             <Route path="profile" element={<Profile />} />
-            <Route path="admin" element={<Admin />} />
+            <Route path="admin" element={<Navigate to="/admin" replace />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="posts" element={<Posts />} />
             <Route path="jobs" element={<Jobs />} />
             <Route path="business/:id" element={<BusinessProfile />} />
+          </Route>
+          <Route path="/admin" element={<ProtectedAdmin />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="approvals" element={<Approvals />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="users/:id" element={<UserDetail />} />
+            <Route path="content" element={<Content />} />
+            <Route path="deals" element={<AdminDeals />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="team" element={<Team />} />
+            <Route path="activity" element={<Activity />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

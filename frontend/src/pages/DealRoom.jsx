@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Lock, ShieldAlert, Check, X, Repeat, Ban, Link2, PackageCheck, Star, Crown, Loader2, Calendar, ExternalLink, Wallet, ChevronDown } from "lucide-react";
+import { ArrowLeft, Send, Lock, ShieldAlert, Check, X, Repeat, Ban, Link2, PackageCheck, Star, Crown, Loader2, Calendar, ExternalLink, Wallet, ChevronDown, AlertTriangle, PauseCircle } from "lucide-react";
+import { ReportButton } from "@/components/ReportButton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -37,6 +38,12 @@ const Rate = ({ onRate }) => {
       <Btn onClick={() => onRate(stars, review)} testid="rate-submit-button">Submit rating</Btn>
     </div>
   );
+};
+
+const Dispute = ({ act }) => {
+  const [open, setOpen] = useState(false);
+  if (!open) return <Btn tone="ghost" onClick={() => setOpen(true)} testid="deal-dispute-button"><AlertTriangle className="h-4 w-4" />Raise a dispute</Btn>;
+  return <div className="w-full"><InlineInput placeholder="What went wrong?" cta="Send" icon={AlertTriangle} testid="deal-dispute" onSubmit={(v) => act("dispute", { note: v })} /></div>;
 };
 
 const Actions = ({ deal, act, reload, me, config, api }) => {
@@ -80,10 +87,16 @@ const Actions = ({ deal, act, reload, me, config, api }) => {
         <div className="space-y-2.5">
           <a href={deal.delivery_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-bold underline" data-testid="deal-view-work-link"><ExternalLink className="h-4 w-4" />View submitted work</a>
           {note("Happy with it? Approve to release the payment to the creator.")}
-          <Btn tone="cta" onClick={() => act("mark_delivered")} testid="deal-mark-delivered-button"><PackageCheck className="h-4 w-4" />Approve & mark delivered</Btn>
+          <div className="flex flex-wrap gap-2">
+            <Btn tone="cta" onClick={() => act("mark_delivered")} testid="deal-mark-delivered-button"><PackageCheck className="h-4 w-4" />Approve & mark delivered</Btn>
+            <Dispute act={act} />
+          </div>
         </div>
-      ) : note(`Payment held. Waiting for ${deal.creator_name} to submit the work.`))}
-      {st === "delivered" && note(`Work approved. HireMyFace is releasing ${c ? `your payout of ${inr(deal.price - fee)}` : "the payout to the creator"}.`, "text-cyan-200")}
+      ) : (<div className="space-y-2">{note(`Payment held. Waiting for ${deal.creator_name} to submit the work.`)}<Dispute act={act} /></div>))}
+      {st === "disputed" && note(b ? "You raised a dispute. The payout is on hold while our team reviews the deal." : "The business raised a dispute. Your payout is on hold while our team reviews the deal.", "text-orange-200")}
+      {st === "refunded" && note(b ? "Our team refunded this payment to you." : "Our team refunded this payment to the business.", "text-sky-200")}
+      {c && deal.payout_status === "failed" && <p className="text-[13px] text-rose-200">Add your payout UPI in <Link to="/app/settings" className="underline">Settings</Link> to receive {inr(deal.price - fee)}. It's sent as soon as you save it.</p>}
+      {st === "delivered" && deal.payout_status !== "failed" && note(`Work approved. HireMyFace is releasing ${c ? `your payout of ${inr(deal.price - fee)}` : "the payout to the creator"}.`, "text-cyan-200")}
       {st === "completed" && <p className="flex items-center gap-1.5 text-[13px] text-emerald-300"><Wallet className="h-4 w-4" />Completed. {c ? `Payout of ${inr(deal.payout_amount)} released.` : "Payout released to the creator."}</p>}
       {b && ["delivered", "completed"].includes(st) && !deal.rating && <Rate onRate={rate} />}
       {deal.rating && <p className="flex items-center gap-1 text-[13px]">Rated {deal.rating.stars}<Star className="h-4 w-4 fill-amber-300 text-amber-300" />{deal.rating.review && ` · “${deal.rating.review}”`}</p>}
@@ -134,7 +147,7 @@ export default function DealRoom() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [msgs.length]);
 
   const act = async (action, extra = {}) => {
-    const msg = { accept: "Offer accepted", decline: "Offer declined", counter: "Counter-offer sent", accept_counter: "Counter accepted", cancel: "Offer cancelled", submit_work: "Work submitted", mark_delivered: "Marked as delivered" }[action];
+    const msg = { accept: "Offer accepted", decline: "Offer declined", counter: "Counter-offer sent", accept_counter: "Counter accepted", cancel: "Offer cancelled", submit_work: "Work submitted", mark_delivered: "Marked as delivered", dispute: "Dispute sent to our team" }[action];
     try { await api.post(`/deals/${id}/action`, { action, ...extra }); toast.success(msg); reload(); } catch (e) { toast.error(errMsg(e)); }
   };
   const send = async (text) => { try { await api.post(`/deals/${id}/messages`, { text }); reload(); } catch (e) { toast.error(errMsg(e)); } };
@@ -155,6 +168,7 @@ export default function DealRoom() {
         </div>
         <StatusBadge status={deal.status} testid="deal-room-status" />
       </div>
+      {deal.paused && <p className="mt-3 flex items-center gap-2 rounded-2xl bg-orange-400/20 px-3.5 py-2.5 text-xs text-orange-100" data-testid="deal-paused-notice"><PauseCircle className="h-4 w-4 shrink-0" />This deal is paused while our team reviews an account.</p>}
       <div className="glass mt-4 rounded-[24px] p-4" data-testid="deal-summary">
         <button className="flex w-full items-center justify-between" onClick={() => setOpen(!open)} data-testid="deal-summary-toggle">
           <span className="font-extrabold">{deal.plan_label} · <span data-testid="deal-price">{inr(deal.price)}</span></span>
@@ -193,6 +207,7 @@ export default function DealRoom() {
         </div>
         <div className="border-t border-white/10"><Composer deal={deal} onSend={send} /></div>
       </div>
+      {(deal.is_business || deal.is_creator) && <div className="mt-3 text-center"><ReportButton type="deal" id={deal.id} label="Report this chat" testid="deal-report-button" /></div>}
     </div>
   );
 }

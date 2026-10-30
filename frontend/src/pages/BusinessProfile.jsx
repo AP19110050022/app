@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Bookmark, Pencil, Loader2, MapPin, Globe } from "lucide-react";
 import { JobCard } from "@/pages/Discover";
+import { ReportButton } from "@/components/ReportButton";
 import { PLAN_BY_ID } from "@/constants/options";
 import { useMe } from "@/context/MeContext";
 import { errMsg } from "@/lib/api";
@@ -46,6 +47,7 @@ export default function BusinessProfile() {
       <p className="mt-3 text-[17px] font-extrabold">{b.company}{b.live === false && <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] uppercase">Offline</span>}</p>
       <p className="text-[14px] text-white/80">{b.industry}</p>
       {b.description && <p className="mt-1 text-[14px]">{b.description}</p>}
+      {!own && <div className="mt-1"><ReportButton type="business" id={b.user_id} label="Report business" testid="business-report-button" /></div>}
       <div className="glass mt-4 space-y-1.5 rounded-[22px] p-4 text-sm">
         <p className="flex items-center gap-2"><MapPin className="h-4 w-4 text-white/60" />{b.city}{b.state ? `, ${b.state}` : ""}</p>
         {b.website && <p className="flex items-center gap-2 truncate"><Globe className="h-4 w-4 text-white/60" />{b.website}</p>}
