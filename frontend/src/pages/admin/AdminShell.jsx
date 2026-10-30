@@ -1,13 +1,13 @@
 import { useEffect } from "react";
 import { NavLink, Outlet, Link, Navigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, BadgeCheck, Flag, Users, Images, Handshake, UserCog, History, ArrowLeft, Loader2 } from "lucide-react";
+import { LayoutDashboard, BadgeCheck, Flag, Users, Images, Handshake, UserCog, History, ArrowLeft, Loader2, Tag } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useMe } from "@/context/MeContext";
 import { BlockedScreen } from "@/components/layout/AppShell";
 
 const NAV = [
   ["", "Dashboard", LayoutDashboard], ["approvals", "Approvals", BadgeCheck], ["reports", "Reports", Flag], ["users", "Users", Users],
-  ["content", "Jobs & posts", Images], ["deals", "Deals", Handshake], ["team", "Team", UserCog, true], ["activity", "Activity", History],
+  ["content", "Jobs & posts", Images], ["deals", "Deals", Handshake], ["pricing", "Prices", Tag], ["team", "Team", UserCog, true], ["activity", "Activity", History],
 ];
 
 const Item = ({ to, label, icon: Icon, mobile }) => (

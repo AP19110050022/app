@@ -6,7 +6,7 @@ import { OfferDialog } from "@/components/OfferDialog";
 import { ReportButton } from "@/components/ReportButton";
 import { PLANS } from "@/constants/options";
 import { useMe } from "@/context/MeContext";
-import { inr } from "@/lib/api";
+import { errMsg, inr } from "@/lib/api";
 
 const isImg = (u) => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u) || u.startsWith("data:image") || u.includes("images.unsplash.com");
 const TABS = [["posts", "Posts", Grid3x3], ["prices", "Prices", Tag], ["about", "About", Info], ["reviews", "Reviews", Star]];
@@ -82,6 +82,7 @@ export default function CreatorProfile() {
   useEffect(() => {
     api.get(`/creators/${id}`).then((r) => setC(r.data)).catch(() => setMissing(true));
     api.get("/saved/ids").then((r) => setSaved(r.data.includes(id)));
+    api.post(`/creators/${id}/view`).catch(() => {});
   }, [api, id]);
 
   if (missing) return <div className="py-20 text-center" data-testid="creator-not-found"><p className="font-bold">This creator isn't available.</p><Link to="/app" className="text-white/70 underline">Back to discover</Link></div>;
@@ -89,9 +90,9 @@ export default function CreatorProfile() {
   const own = c.user_id === me.user.user_id;
   const toggleSave = async () => { await (saved ? api.delete(`/saved/${id}`) : api.post(`/saved/${id}`)); setSaved(!saved); toast.success(saved ? "Removed from saved" : "Saved"); };
   const message = async () => {
-    const { data } = await api.get("/deals", { params: { side: "business" } });
-    const d = data.find((x) => x.creator_id === id && !["declined", "cancelled"].includes(x.status));
-    d ? navigate(`/app/chat/${d.id}`) : setOfferPlan(c.plans?.[0] || "per_video");
+    if (!me.business) return setOfferPlan(c.plans?.[0] || "per_video");
+    try { const { data } = await api.post("/chats", { creator_id: id }); navigate(`/app/chat/${data.id}`); }
+    catch (e) { toast.error(errMsg(e)); if (e?.response?.status === 402) navigate("/app/upgrade"); }
   };
 
   return (
@@ -105,9 +106,9 @@ export default function CreatorProfile() {
       <div className="px-4 pt-2">
         <div className="flex items-center gap-5">
           <span className="ring-story shrink-0 rounded-full p-[3px]"><img src={c.photo} alt={c.name} className="h-[86px] w-[86px] rounded-full border-[3px] border-[#3B25A8] object-cover" /></span>
-          <div className="grid flex-1 grid-cols-3 text-center">
-            {[[(c.samples?.length || 0) + 1 + (c.intro_video ? 1 : 0), "Posts"], [c.deals_done || 0, "Jobs done"], [c.rating_count ? `${c.rating_avg}★` : "–", c.rating_count ? `${c.rating_count} reviews` : "No reviews"]].map(([v, l]) => (
-              <div key={l}><p className="text-xl font-extrabold">{v}</p><p className="text-[13px] text-white/75">{l}</p></div>
+          <div className="grid flex-1 grid-cols-4 text-center">
+            {[[(c.samples?.length || 0) + 1 + (c.intro_video ? 1 : 0), "Posts"], [c.views || 0, "Visits"], [c.deals_done || 0, "Jobs done"], [c.rating_count ? `${c.rating_avg}★` : "–", c.rating_count ? `${c.rating_count} reviews` : "Reviews"]].map(([v, l]) => (
+              <div key={l} data-testid={`creator-stat-${l.split(" ")[0].toLowerCase()}`}><p className="text-lg font-extrabold sm:text-xl">{v}</p><p className="text-[12px] text-white/75 sm:text-[13px]">{l}</p></div>
             ))}
           </div>
         </div>

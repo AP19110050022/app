@@ -15,9 +15,9 @@ export default function ChatList() {
 
   return (
     <div className="mx-auto max-w-2xl" data-testid="chat-list-page">
-      <SubHeader title="Chat" sub="Every offer has its own chat. Contacts stay hidden until payment." />
+      <SubHeader title="Chat" sub="Message creators and businesses. Contacts stay hidden until a deal is paid." />
       {deals === null ? <div className="grid place-items-center py-16"><Loader2 className="h-7 w-7 animate-spin" /></div>
-        : deals.length === 0 ? <Empty icon={MessageCircle} title="No conversations yet" text="A chat opens as soon as an offer is sent." testid="chat-empty" />
+        : deals.length === 0 ? <Empty icon={MessageCircle} title="No conversations yet" text="Tap Message on a creator's profile to start a chat." testid="chat-empty" />
         : (
           <div className="space-y-1">
             {deals.map((d) => {
@@ -28,7 +28,7 @@ export default function ChatList() {
                   <span className="ring-story shrink-0 rounded-full p-[2px]"><span className="block rounded-full border-2 border-[#3B25A8]"><Avatar img={asBiz ? d.creator_photo : d.business_logo} name={name} size="h-12 w-12" /></span></span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2"><p className="truncate font-extrabold">{name}</p><span className="shrink-0 text-xs text-white/60">{timeAgo(d.updated_at)}</span></div>
-                    <div className="flex items-center gap-2"><p className="truncate text-[13px] text-white/75">{d.last_message || `${d.plan_label} offer`}</p><span className="ml-auto shrink-0"><StatusBadge status={d.status} testid={`chat-status-${d.id}`} /></span></div>
+                    <div className="flex items-center gap-2"><p className="truncate text-[13px] text-white/75">{d.last_message || (d.status === "chat" ? "Say hello" : `${d.plan_label} offer`)}</p><span className="ml-auto shrink-0"><StatusBadge status={d.status} testid={`chat-status-${d.id}`} /></span></div>
                   </div>
                 </Link>
               );

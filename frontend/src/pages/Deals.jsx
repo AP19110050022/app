@@ -52,7 +52,7 @@ export default function Deals() {
   const [group, setGroup] = useState("all");
   const [deals, setDeals] = useState(null);
 
-  useEffect(() => { api.get("/deals", { params: { side: both ? side : "all" } }).then((r) => setDeals(r.data)); }, [api, side, both]);
+  useEffect(() => { api.get("/deals", { params: { side: both ? side : "all" } }).then((r) => setDeals(r.data.filter((d) => d.status !== "chat"))); }, [api, side, both]);
   const shown = useMemo(() => (deals || []).filter(GROUPS[group]), [deals, group]);
 
   return (

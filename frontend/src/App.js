@@ -19,6 +19,8 @@ import Saved from "@/pages/Saved";
 import Upgrade from "@/pages/Upgrade";
 import Profile from "@/pages/Profile";
 import AdminShell from "@/pages/admin/AdminShell";
+import Pricing from "@/pages/admin/Pricing";
+import { RouteTracker } from "@/lib/track";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import Approvals from "@/pages/admin/Approvals";
 import AdminUsers from "@/pages/admin/Users";
@@ -51,6 +53,7 @@ function App() {
   return (
     <BrowserRouter>
       <ClerkAuthProvider>
+        <RouteTracker />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/sign-in/*" element={<SignInPage />} />
@@ -83,6 +86,7 @@ function App() {
             <Route path="deals" element={<AdminDeals />} />
             <Route path="reports" element={<Reports />} />
             <Route path="team" element={<Team />} />
+            <Route path="pricing" element={<Pricing />} />
             <Route path="activity" element={<Activity />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -4,10 +4,10 @@ import { PayButton } from "@/components/PayButton";
 import { useMe } from "@/context/MeContext";
 import { inr } from "@/lib/api";
 
-const ROWS = [
+const ROWS_FN = (n) => [
   ["Browse, filter & save creators", true, true],
-  ["Offers per month", "2", "Unlimited"],
-  ["Chat with creators", false, true],
+  ["Creators you can contact", String(n), "Unlimited"],
+  ["Chat with those creators", true, true],
   ["Pay safely in the app", false, true],
   ["Verified business badge", false, true],
 ];
@@ -17,6 +17,7 @@ export default function Upgrade() {
   const { me, config } = useMe();
   const navigate = useNavigate();
   const price = config?.pro_price ?? 999;
+  const rows = ROWS_FN(config?.free_contacts ?? 3);
   return (
     <div className="mx-auto max-w-xl" data-testid="upgrade-page">
       <button onClick={() => navigate(-1)} className="mb-4 grid h-11 w-11 place-items-center rounded-full bg-white/15" aria-label="Back" data-testid="upgrade-back"><ArrowLeft className="h-5 w-5" /></button>
@@ -25,7 +26,7 @@ export default function Upgrade() {
         <div className="relative">
           <Crown className="h-9 w-9" />
           <h1 className="mt-3 text-[32px] font-extrabold leading-tight">Business Pro</h1>
-          <p className="text-[15px] text-white/90">Unlimited offers, chat with every creator, and safe in-app payments.</p>
+          <p className="text-[15px] text-white/90">Contact unlimited creators, chat with all of them, and pay safely in the app.</p>
           <p className="mt-5"><span className="text-5xl font-extrabold">{inr(price)}</span><span className="text-white/80"> / {config?.pro_days ?? 30} days</span></p>
           {me.is_pro && <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3.5 py-1.5 text-sm font-bold" data-testid="pro-active-badge"><Check className="h-4 w-4" />Active until {new Date(me.user.pro_until).toLocaleDateString()}</p>}
           <div className="mt-5">
@@ -41,7 +42,7 @@ export default function Upgrade() {
       <div className="glass mt-5 overflow-hidden rounded-[24px]">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-white/15 text-left"><th className="p-3.5">Feature</th><th className="p-3.5 text-center">Free</th><th className="p-3.5 text-center">Pro</th></tr></thead>
-          <tbody>{ROWS.map(([f, a, b]) => <tr key={f} className="border-b border-white/10 last:border-0"><td className="p-3.5">{f}</td><td className="p-3.5 text-center"><Cell v={a} /></td><td className="p-3.5 text-center"><Cell v={b} /></td></tr>)}</tbody>
+          <tbody>{rows.map(([f, a, b]) => <tr key={f} className="border-b border-white/10 last:border-0"><td className="p-3.5">{f}</td><td className="p-3.5 text-center"><Cell v={a} /></td><td className="p-3.5 text-center"><Cell v={b} /></td></tr>)}</tbody>
         </table>
       </div>
       <p className="mt-4 text-center text-xs text-white/60">Creators join free. A {config?.fee_pct ?? 10}% service fee is taken from the creator's payout on each paid deal.</p>

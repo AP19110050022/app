@@ -4,6 +4,8 @@ import { Users, Clapperboard, Store, Crown, Briefcase, Handshake, CheckCircle2, 
 import { Seg } from "@/components/AppBits";
 import { inr } from "@/lib/api";
 import { H1, Spinner, useAdminData } from "@/pages/admin/bits";
+import { Growth } from "@/pages/admin/Growth";
+import { Journey } from "@/pages/admin/Journey";
 
 const Card = ({ icon: Icon, label, value, sub, testid, big }) => (
   <div className={`glass rise rounded-[22px] p-4 ${big ? "bg-white/[.14]" : ""}`} data-testid={testid}>
@@ -53,6 +55,8 @@ export default function AdminDashboard() {
           <Card icon={Handshake} label="Active deals" value={s.active_deals} testid="stat-active-deals" />
           <Card icon={CheckCircle2} label="Completed deals" value={s.completed_deals} testid="stat-completed-deals" />
         </div>
+        <Growth />
+        <Journey range={range} />
       </>)}
     </div>
   );

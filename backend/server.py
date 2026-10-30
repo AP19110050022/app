@@ -11,7 +11,7 @@ from typing import List, Literal, Optional
 import razorpay
 import requests
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
@@ -38,10 +38,8 @@ app = FastAPI()
 api = APIRouter(prefix="/api")
 logger = logging.getLogger("hiremyface")
 
-PRO_PRICE = 999
-PRO_DAYS = 30
-FEE_PCT = 10
-FREE_OFFER_LIMIT = 2
+DEFAULT_PRICING = {"pro_price": 999, "pro_days": 30, "fee_pct": 10, "free_contacts": 3}
+CLOSED_DEALS = ("declined", "cancelled", "completed", "refunded")
 PLANS = ("per_video", "part_time", "full_time")
 PlanT = Literal["per_video", "part_time", "full_time"]
 PAID_STATES = ("paid", "delivered", "completed", "disputed", "refunded")
@@ -326,6 +324,24 @@ def public_creator(c: dict) -> dict:
     return c
 
 
+async def pricing() -> dict:
+    doc = await db.settings.find_one({"_id": "pricing"}, {"_id": 0}) or {}
+    return {**DEFAULT_PRICING, **doc}
+
+
+async def contacts_used(uid: str) -> list:
+    return await db.deals.distinct("creator_id", {"business_id": uid})
+
+
+async def check_contact(member: dict, creator_id: str):
+    if is_pro(member):
+        return
+    used = await contacts_used(member["user_id"])
+    limit = (await pricing())["free_contacts"]
+    if creator_id not in used and len(used) >= limit:
+        raise HTTPException(402, f"Free accounts can contact up to {limit} creators. Upgrade to Business Pro to contact more.")
+
+
 async def get_deal_for(deal_id: str, member: dict) -> dict:
     scope = {} if member["role"] in ADMIN_ROLES else {"$or": [{"business_id": member["user_id"]}, {"creator_id": member["user_id"]}]}
     deal = await db.deals.find_one({"id": deal_id, **scope}, {"_id": 0})
@@ -335,10 +351,12 @@ async def get_deal_for(deal_id: str, member: dict) -> dict:
 
 
 async def mark_payment_done(pay: dict, gateway_payment_id: str):
+    prices = await pricing()
     if pay["kind"] == "deal":
         deal = await db.deals.find_one_and_update(
             {"id": pay["deal_id"], "status": "accepted"},
-            {"$set": {"status": "paid", "paid_at": iso(), "payout_status": "held", "payment_id": pay["id"], "updated_at": iso()},
+            {"$set": {"status": "paid", "paid_at": iso(), "payout_status": "held", "payment_id": pay["id"], "updated_at": iso(),
+                      "fee_pct": pay.get("fee_pct", prices["fee_pct"])},
              "$push": {"history": {"status": "paid", "at": iso()}}},
             projection={"_id": 0})
         if not deal:
@@ -352,7 +370,7 @@ async def mark_payment_done(pay: dict, gateway_payment_id: str):
         base = now()
         if user and user.get("pro_until") and datetime.fromisoformat(user["pro_until"]) > base:
             base = datetime.fromisoformat(user["pro_until"])
-        await db.users.update_one({"user_id": pay["user_id"]}, {"$set": {"pro_until": (base + timedelta(days=PRO_DAYS)).isoformat()}})
+        await db.users.update_one({"user_id": pay["user_id"]}, {"$set": {"pro_until": (base + timedelta(days=pay.get("pro_days", prices["pro_days"]))).isoformat()}})
         await notify(pay["user_id"], "payment", "Business Pro is active. Chat and in-app payments are unlocked.", "/app/profile")
     else:
         await notify(deal["creator_id"], "payment", f"Payment received and held for '{deal['plan_label']}'. Start the work!", f"/app/chat/{deal['id']}")
@@ -445,7 +463,29 @@ async def root():
 @api.get("/config")
 async def config():
     return {"payments_mode": "razorpay" if rzp_client() else "test", "razorpay_key_id": os.environ.get("RAZORPAY_KEY_ID", ""),
-            "pro_price": PRO_PRICE, "pro_days": PRO_DAYS, "fee_pct": FEE_PCT, "free_offer_limit": FREE_OFFER_LIMIT}
+            **await pricing()}
+
+
+class TrackIn(BaseModel):
+    session_id: str = Field(min_length=6, max_length=64)
+    page: str = Field(min_length=1, max_length=60)
+
+
+@api.post("/track")
+async def track(body: TrackIn):
+    await db.events.insert_one({"session_id": body.session_id, "page": body.page, "at": iso()})
+    return {"ok": True}
+
+
+@api.post("/creators/{creator_id}/view")
+async def view_creator(creator_id: str, member: dict = Depends(current_member)):
+    if creator_id == member["user_id"]:
+        return {"ok": True}
+    r = await db.profile_views.update_one({"creator_id": creator_id, "viewer_id": member["user_id"], "day": iso()[:10]},
+                                          {"$setOnInsert": {"at": iso()}}, upsert=True)
+    if r.upserted_id:
+        await db.creators.update_one({"user_id": creator_id}, {"$inc": {"views": 1}})
+    return {"ok": True}
 
 
 @api.get("/creators")
@@ -491,11 +531,10 @@ async def me(member: dict = Depends(current_member)):
     creator = await db.creators.find_one({"user_id": uid}, {"_id": 0})
     business = await db.businesses.find_one({"user_id": uid}, {"_id": 0})
     unread = await db.notifications.count_documents({"user_id": uid, "read": False})
-    month_start = now().replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
-    offers_this_month = await db.deals.count_documents({"business_id": uid, "created_at": {"$gte": month_start}})
     return {"user": member, "creator": creator, "business": business, "is_pro": is_pro(member),
             "jobs_count": await db.jobs.count_documents({"business_id": uid}),
-            "unread_notifications": unread, "offers_this_month": offers_this_month}
+            "unread_notifications": unread, "contacts_used": len(await contacts_used(uid)),
+            "free_contacts": (await pricing())["free_contacts"]}
 
 
 @api.patch("/me")
@@ -739,11 +778,16 @@ async def create_deal(body: OfferIn, member: dict = Depends(current_member)):
         raise HTTPException(400, f"{creator['name']} is offline right now and isn't taking new offers")
     if not creator.get(RATE_FIELD[body.plan]):
         raise HTTPException(400, f"{creator['name']} doesn't offer the {PLAN_LABEL[body.plan]} plan")
-    if not is_pro(member):
-        month_start = now().replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
-        if await db.deals.count_documents({"business_id": uid, "created_at": {"$gte": month_start}}) >= FREE_OFFER_LIMIT:
-            raise HTTPException(402, f"Free plan allows {FREE_OFFER_LIMIT} offers a month. Upgrade to Business Pro for unlimited offers.")
-    deal = {"id": new_id(), "business_id": uid, "creator_id": body.creator_id, "business_name": business["company"],
+    await check_contact(member, body.creator_id)
+    offer = {"plan": body.plan, "plan_label": PLAN_LABEL[body.plan], "brief": body.brief, "start_date": body.start_date,
+             "price": body.price, "counter_price": None, "status": "pending", "updated_at": iso()}
+    thread = await db.deals.find_one_and_update({"business_id": uid, "creator_id": body.creator_id, "status": "chat"},
+                                                {"$set": offer, "$push": {"history": {"status": "pending", "at": iso()}}},
+                                                projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if thread:
+        await notify(body.creator_id, "offer", f"New {offer['plan_label']} offer from {business['company']} for ₹{body.price:,}", f"/app/chat/{thread['id']}")
+        return thread
+    deal = {"id": new_id(), "free_chat": not is_pro(member), "business_id": uid, "creator_id": body.creator_id, "business_name": business["company"],
             "business_logo": business.get("logo", ""), "creator_name": creator["name"], "creator_photo": creator["photo"],
             "plan": body.plan, "plan_label": PLAN_LABEL[body.plan], "brief": body.brief, "start_date": body.start_date,
             "price": body.price, "counter_price": None, "status": "pending", "delivery_link": "", "payout_status": None,
@@ -751,6 +795,35 @@ async def create_deal(body: OfferIn, member: dict = Depends(current_member)):
     await db.deals.insert_one({**deal})
     await notify(body.creator_id, "offer", f"New {deal['plan_label']} offer from {business['company']} for ₹{body.price:,}", f"/app/chat/{deal['id']}")
     return deal
+
+
+class ChatIn(BaseModel):
+    creator_id: str = Field(min_length=1, max_length=80)
+
+
+@api.post("/chats")
+async def start_chat(body: ChatIn, member: dict = Depends(current_member)):
+    uid = member["user_id"]
+    business = await db.businesses.find_one({"user_id": uid}, {"_id": 0})
+    if not business:
+        raise HTTPException(400, "Create your business profile first")
+    if body.creator_id == uid:
+        raise HTTPException(400, "You can't message yourself")
+    existing = await db.deals.find_one({"business_id": uid, "creator_id": body.creator_id, "status": {"$nin": list(CLOSED_DEALS)}},
+                                       {"_id": 0, "id": 1}, sort=[("updated_at", -1)])
+    if existing:
+        return existing
+    creator = await db.creators.find_one({"user_id": body.creator_id, "status": "approved", **HIDE}, {"_id": 0})
+    if not creator:
+        raise HTTPException(404, "Creator not found")
+    await check_contact(member, body.creator_id)
+    deal = {"id": new_id(), "business_id": uid, "creator_id": body.creator_id, "business_name": business["company"],
+            "business_logo": business.get("logo", ""), "creator_name": creator["name"], "creator_photo": creator["photo"],
+            "plan": None, "plan_label": "Chat", "brief": "", "start_date": "", "price": 0, "counter_price": None, "status": "chat",
+            "free_chat": not is_pro(member), "delivery_link": "", "payout_status": None, "rating": None,
+            "history": [{"status": "chat", "at": iso()}], "created_at": iso(), "updated_at": iso()}
+    await db.deals.insert_one({**deal})
+    return {"id": deal["id"]}
 
 
 @api.get("/deals")
@@ -765,7 +838,7 @@ async def list_deals(side: Literal["business", "creator", "all"] = "all", member
 async def get_deal(deal_id: str, member: dict = Depends(current_member)):
     deal = await get_deal_for(deal_id, member)
     biz_user = await db.users.find_one({"user_id": deal["business_id"]}, {"_id": 0})
-    chat_open = bool(biz_user and is_pro(biz_user))
+    chat_open = bool(biz_user and (is_pro(biz_user) or deal.get("free_chat")))
     return {**deal, "chat_open": chat_open, "is_business": deal["business_id"] == member["user_id"],
             "is_creator": deal["creator_id"] == member["user_id"]}
 
@@ -862,7 +935,7 @@ async def list_messages(deal_id: str, member: dict = Depends(current_member)):
 async def send_message(deal_id: str, body: MessageIn, member: dict = Depends(current_member)):
     deal = await get_deal_for(deal_id, member)
     biz_user = await db.users.find_one({"user_id": deal["business_id"]}, {"_id": 0})
-    if not (biz_user and is_pro(biz_user)):
+    if not (biz_user and (is_pro(biz_user) or deal.get("free_chat"))):
         raise HTTPException(402, "Chat unlocks when the business upgrades to Business Pro")
     if deal["status"] in ("declined", "cancelled"):
         raise HTTPException(400, "This deal is closed")
@@ -897,10 +970,11 @@ async def read_notifications(member: dict = Depends(current_member)):
 @api.post("/payments/order")
 async def create_order(body: OrderIn, member: dict = Depends(current_member)):
     uid = member["user_id"]
+    prices = await pricing()
     if body.kind == "pro":
         if not await db.businesses.find_one({"user_id": uid}):
             raise HTTPException(400, "Create your business profile first")
-        amount, desc, deal_id = PRO_PRICE, f"Business Pro – {PRO_DAYS} days", None
+        amount, desc, deal_id = prices["pro_price"], f"Business Pro – {prices['pro_days']} days", None
     else:
         deal = await get_deal_for(body.deal_id or "", member)
         if deal["business_id"] != uid or deal["status"] != "accepted":
@@ -909,7 +983,8 @@ async def create_order(body: OrderIn, member: dict = Depends(current_member)):
             raise HTTPException(402, "Upgrade to Business Pro to pay in the app")
         amount, desc, deal_id = deal["price"], f"{deal['plan_label']} – {deal['creator_name']}", deal["id"]
     pay = {"id": new_id(), "user_id": uid, "kind": body.kind, "deal_id": deal_id, "amount": amount, "description": desc,
-           "fee": round(amount * FEE_PCT / 100) if body.kind == "deal" else amount, "status": "created", "created_at": iso()}
+           "fee": round(amount * prices["fee_pct"] / 100) if body.kind == "deal" else amount, "fee_pct": prices["fee_pct"],
+           "pro_days": prices["pro_days"], "status": "created", "created_at": iso()}
     rz = rzp_client()
     if rz:
         order = await run_in_threadpool(rz.order.create, {"amount": amount * 100, "currency": "INR", "receipt": pay["id"][:40], "payment_capture": 1})
@@ -964,7 +1039,7 @@ async def release_payout(deal_id: str) -> dict:
     payout = await db.payouts.find_one({"deal_id": deal_id}, {"_id": 0})
     if payout and payout["status"] == "released":
         return payout
-    amount = deal["price"] - round(deal["price"] * FEE_PCT / 100)
+    amount = deal["price"] - round(deal["price"] * deal.get("fee_pct", (await pricing())["fee_pct"]) / 100)
     if not payout:
         payout = {"id": new_id(), "deal_id": deal_id, "creator_id": deal["creator_id"], "creator_name": deal["creator_name"],
                   "business_name": deal["business_name"], "amount": amount, "mode": "test", "status": "pending",
@@ -1338,6 +1413,96 @@ async def admin_remove(email: str, admin: dict = Depends(owner_dep)):
     return {"ok": True}
 
 
+class PricingIn(BaseModel):
+    pro_price: int = Field(ge=49, le=100_000)
+    pro_days: int = Field(ge=7, le=365)
+    fee_pct: int = Field(ge=0, le=50)
+    free_contacts: int = Field(ge=0, le=50)
+
+
+@api.get("/admin/pricing")
+async def admin_pricing(_: dict = Depends(admin_dep)):
+    return await pricing()
+
+
+@api.put("/admin/pricing")
+async def admin_set_pricing(body: PricingIn, admin: dict = Depends(owner_dep)):
+    old = await pricing()
+    new = body.model_dump()
+    await db.settings.update_one({"_id": "pricing"}, {"$set": new}, upsert=True)
+    changes = ", ".join(f"{k.replace('_', ' ')} {old[k]} → {v}" for k, v in new.items() if old.get(k) != v)
+    await log_action(admin, "changed prices", "Pricing", changes or "no change")
+    return new
+
+
+def _day(s: str) -> str:
+    return (s or "")[:10]
+
+
+@api.get("/admin/growth")
+async def admin_growth(days: int = Query(30, ge=7, le=365), _: dict = Depends(admin_dep)):
+    start = (now() - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    s = start.isoformat()
+    series = {(start + timedelta(days=i)).date().isoformat(): {"users": 0, "creators": 0, "businesses": 0, "deals": 0, "earnings": 0}
+              for i in range(days)}
+
+    async def bump(col, q, field, key, value=lambda d: 1):
+        async for d in db[col].find({**q, field: {"$gte": s}}, {"_id": 0}):
+            if _day(d.get(field)) in series:
+                series[_day(d[field])][key] += value(d)
+    await bump("users", dict(IN_ENV), "created_at", "users")
+    await bump("creators", {"is_sample": {"$ne": True}}, "created_at", "creators")
+    await bump("businesses", {}, "created_at", "businesses")
+    await bump("deals", {"status": {"$ne": "chat"}}, "created_at", "deals")
+    await bump("payments", {"status": "paid", "refund_status": {"$ne": "refunded"}}, "paid_at", "earnings",
+               lambda p: p["fee"] if p["kind"] == "deal" else p["amount"])
+    return [{"date": k, **v} for k, v in series.items()]
+
+
+FUNNEL = [("Visited the site", lambda p: True), ("Opened sign in / sign up", lambda p: p.startswith("Sign")),
+          ("Entered the app", lambda p: not p.startswith(("Landing", "Sign"))), ("Viewed a creator profile", lambda p: p == "Creator profile"),
+          ("Started a profile setup", lambda p: p.startswith(("Creator setup", "Business setup"))),
+          ("Opened a chat or deal", lambda p: p == "Chat room")]
+
+
+@api.get("/admin/journey")
+async def admin_journey(range: Literal["today", "7d", "30d", "all"] = "7d", _: dict = Depends(admin_dep)):
+    s = since_of(range)
+    sessions: dict = {}
+    async for e in db.events.find({"at": {"$gte": s}} if s else {}, {"_id": 0}).sort("at", 1).limit(100_000):
+        sessions.setdefault(e["session_id"], []).append(e)
+    pages: dict = {}
+    for evs in sessions.values():
+        seen = set()
+        for i, e in enumerate(evs):
+            p = pages.setdefault(e["page"], {"page": e["page"], "views": 0, "sessions": 0, "exits": 0, "secs": 0, "timed": 0})
+            p["views"] += 1
+            if e["page"] not in seen:
+                seen.add(e["page"])
+                p["sessions"] += 1
+            if i + 1 < len(evs):
+                gap = (datetime.fromisoformat(evs[i + 1]["at"]) - datetime.fromisoformat(e["at"])).total_seconds()
+                if gap < 1800:
+                    p["secs"] += gap
+                    p["timed"] += 1
+            else:
+                p["exits"] += 1
+    rows = [{"page": p["page"], "views": p["views"], "sessions": p["sessions"], "exits": p["exits"],
+             "exit_rate": round(100 * p["exits"] / p["sessions"]) if p["sessions"] else 0,
+             "avg_seconds": round(p["secs"] / p["timed"]) if p["timed"] else None} for p in pages.values()]
+    funnel = [{"step": name, "sessions": sum(1 for evs in sessions.values() if any(test(e["page"]) for e in evs))} for name, test in FUNNEL]
+    users_q = {**IN_ENV, **({"created_at": {"$gte": s}} if s else {})}
+    new_users = [u["user_id"] for u in await db.users.find(users_q, {"user_id": 1}).to_list(50000)]
+    with_profile = set(await db.creators.distinct("user_id", {"user_id": {"$in": new_users}})) | \
+        set(await db.businesses.distinct("user_id", {"user_id": {"$in": new_users}}))
+    contacted = set(await db.deals.distinct("business_id", {"business_id": {"$in": new_users}}))
+    paid = set(await db.deals.distinct("business_id", {"business_id": {"$in": new_users}, "paid_at": {"$exists": True}}))
+    accounts = [{"step": "Signed up", "users": len(new_users)}, {"step": "Created a creator or business profile", "users": len(with_profile)},
+                {"step": "Business contacted a creator", "users": len(contacted)}, {"step": "Business paid for a deal", "users": len(paid)}]
+    return {"sessions": len(sessions), "funnel": funnel, "accounts": accounts,
+            "pages": sorted(rows, key=lambda r: -r["exits"])[:40]}
+
+
 @api.get("/admin/log")
 async def admin_activity(_: dict = Depends(admin_dep)):
     return await db.admin_log.find({}, {"_id": 0}).sort("at", -1).to_list(300)
@@ -1356,6 +1521,8 @@ async def startup():
     await db.reports.create_index([("reporter_id", 1), ("target_type", 1), ("target_id", 1), ("kind", 1)], unique=True)
     await db.payouts.create_index("deal_id", unique=True)
     await db.admin_invites.create_index("email", unique=True)
+    await db.profile_views.create_index([("creator_id", 1), ("viewer_id", 1), ("day", 1)], unique=True)
+    await db.events.create_index("at")
     async for d in db.deals.find({"payout_status": "ready"}, {"_id": 0, "id": 1}):
         await release_payout(d["id"])
     if not await db.creators.find_one({"is_sample": True}):

@@ -76,7 +76,7 @@ export default function Profile() {
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 rounded-2xl bg-white/10 py-3 text-center">
-          {(isC ? [[posts, "Posts"], [p.plans?.length || 0, "Services"], [p.live !== false ? "Live" : "Offline", "Visibility"]]
+          {(isC ? [[posts, "Posts"], [p.views || 0, "Visits"], [p.live !== false ? "Live" : "Offline", "Visibility"]]
             : [[me.jobs_count ?? "–", "Jobs posted"], [(p.need_plans || []).length, "Plans needed"], [me.is_pro ? "Pro" : "Free", "Plan"]]).map(([v, l]) => (
             <div key={l}><p className="text-lg font-extrabold">{v}</p><p className="text-[11px] text-white/70">{l}</p></div>
           ))}
@@ -100,7 +100,7 @@ export default function Profile() {
         <Panel title="Business tools" testid="business-tools">
           <ToolRow to="/app/jobs" icon={Briefcase} title="My jobs" sub="Post work so creators can find you and show interest" testid="tool-jobs" />
           <ToolRow to="/app/setup/business?step=1" icon={Pencil} title="Hiring preferences" sub={`${(p.need_plans || []).map((x) => PLAN_BY_ID[x]?.label).join(", ")} · Budget ${p.budget}`} testid="tool-preferences" />
-          <ToolRow to="/app/upgrade" icon={Crown} title={me.is_pro ? "Business Pro" : "Upgrade to Business Pro"} sub={me.is_pro ? `Active until ${new Date(me.user.pro_until).toLocaleDateString()}` : `${me.offers_this_month}/2 free offers used this month`} testid="tool-upgrade" />
+          <ToolRow to="/app/upgrade" icon={Crown} title={me.is_pro ? "Business Pro" : "Upgrade to Business Pro"} sub={me.is_pro ? `Active until ${new Date(me.user.pro_until).toLocaleDateString()}` : `${me.contacts_used}/${me.free_contacts} free creator contacts used`} testid="tool-upgrade" />
         </Panel>
       )}
       <Panel title="Account">

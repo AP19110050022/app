@@ -50,6 +50,7 @@ export const STATUS = {
   cancelled: { label: "Cancelled", cls: "bg-slate-100 text-slate-600 border-slate-200", icon: Ban },
   disputed: { label: "In dispute", cls: "bg-orange-100 text-orange-800 border-orange-200", icon: XCircle },
   refunded: { label: "Refunded", cls: "bg-sky-100 text-sky-800 border-sky-200", icon: Repeat },
+  chat: { label: "Chat", cls: "bg-violet-100 text-violet-800 border-violet-200", icon: Clock },
 };
 
 export const PIPELINE = ["pending", "accepted", "paid", "delivered", "completed"];

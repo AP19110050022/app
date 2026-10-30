@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Send, Lock, ShieldAlert, Check, X, Repeat, Ban, Link2, PackageCheck, Star, Crown, Loader2, Calendar, ExternalLink, Wallet, ChevronDown, AlertTriangle, PauseCircle } from "lucide-react";
 import { ReportButton } from "@/components/ReportButton";
+import { OfferDialog } from "@/components/OfferDialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -106,6 +107,20 @@ const Actions = ({ deal, act, reload, me, config, api }) => {
   );
 };
 
+const ChatOffer = ({ deal, reload }) => {
+  const { api } = useMe();
+  const [creator, setCreator] = useState(null);
+  const open = async () => { try { setCreator((await api.get(`/creators/${deal.creator_id}`)).data); } catch (e) { toast.error(errMsg(e)); } };
+  if (!deal.is_business) return <p className="glass-soft mt-4 rounded-[20px] px-4 py-3 text-[13px] text-white/80" data-testid="chat-no-offer-note">{deal.business_name} messaged you. No offer yet — ask anything, an offer will show here when they send one.</p>;
+  return (
+    <div className="glass mt-4 flex items-center gap-3 rounded-[22px] p-3.5" data-testid="chat-offer-bar">
+      <p className="min-w-0 flex-1 text-[13px] text-white/85">Agreed on the details? Send {deal.creator_name.split(" ")[0]} an offer right here.</p>
+      <Btn tone="cta" onClick={open} testid="chat-send-offer-button"><Send className="h-4 w-4" />Send offer</Btn>
+      {creator && <OfferDialog creator={creator} open={!!creator} initialPlan={creator.plans?.[0]} onSent={reload} onOpenChange={(o) => !o && setCreator(null)} />}
+    </div>
+  );
+};
+
 const Composer = ({ deal, onSend }) => {
   const [t, setT] = useState("");
   if (["declined", "cancelled"].includes(deal.status)) return <p className="p-4 text-center text-sm text-white/50">This deal is closed.</p>;
@@ -113,7 +128,7 @@ const Composer = ({ deal, onSend }) => {
     return (
       <div className="flex flex-col items-center gap-2 p-4 text-center" data-testid="chat-locked">
         <Lock className="h-5 w-5" />
-        <p className="text-[13px] text-white/80">{deal.is_business ? "Chat unlocks with Business Pro." : "Chat opens once the business upgrades to Business Pro."}</p>
+        <p className="text-[13px] text-white/80">{deal.is_business ? "You've used your free creator contacts. Upgrade to Business Pro to chat." : "Chat opens once the business upgrades to Business Pro."}</p>
         {deal.is_business && <Link to="/app/upgrade"><Btn tone="cta" testid="chat-upgrade-button"><Crown className="h-4 w-4" />Upgrade · {inr(999)}/mo</Btn></Link>}
       </div>
     );
@@ -164,12 +179,12 @@ export default function DealRoom() {
         <Avatar img={other.img} name={other.name} size="h-11 w-11" />
         <div className="min-w-0 flex-1">
           {other.link ? <Link to={other.link} className="block truncate font-extrabold hover:underline">{other.name}</Link> : <p className="truncate font-extrabold">{other.name}</p>}
-          <p className="text-xs text-white/70">{deal.plan_label} deal</p>
+          <p className="text-xs text-white/70">{deal.status === "chat" ? "Chat · no offer yet" : `${deal.plan_label} deal`}</p>
         </div>
         <StatusBadge status={deal.status} testid="deal-room-status" />
       </div>
       {deal.paused && <p className="mt-3 flex items-center gap-2 rounded-2xl bg-orange-400/20 px-3.5 py-2.5 text-xs text-orange-100" data-testid="deal-paused-notice"><PauseCircle className="h-4 w-4 shrink-0" />This deal is paused while our team reviews an account.</p>}
-      <div className="glass mt-4 rounded-[24px] p-4" data-testid="deal-summary">
+      {deal.status === "chat" ? <ChatOffer deal={deal} reload={reload} /> : <div className="glass mt-4 rounded-[24px] p-4" data-testid="deal-summary">
         <button className="flex w-full items-center justify-between" onClick={() => setOpen(!open)} data-testid="deal-summary-toggle">
           <span className="font-extrabold">{deal.plan_label} · <span data-testid="deal-price">{inr(deal.price)}</span></span>
           <ChevronDown className={`h-5 w-5 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -183,7 +198,7 @@ export default function DealRoom() {
             <div className="border-t border-white/15 pt-3"><Actions deal={deal} act={act} reload={reload} me={me} config={config} api={api} /></div>
           </div>
         )}
-      </div>
+      </div>}
       {!paid && (
         <p className="mt-3 flex items-start gap-2 rounded-2xl bg-amber-400/15 px-3.5 py-2.5 text-xs text-amber-100" data-testid="chat-safety-notice">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />Phone numbers, emails and links are hidden until the deal is paid.

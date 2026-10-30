@@ -33,8 +33,8 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
   }, [open, initialPlan, creator]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (p) => { setPlan(p.id); setPrice(creator[p.rate]); };
-  const limit = config?.free_offer_limit ?? 2;
-  const left = Math.max(0, limit - (me?.offers_this_month || 0));
+  const limit = me?.free_contacts ?? config?.free_contacts ?? 3;
+  const left = Math.max(0, limit - (me?.contacts_used || 0));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -92,7 +92,7 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
           </div>
           {!me.is_pro && (
             <p className="flex items-start gap-2 rounded-2xl bg-white/10 p-3 text-xs text-white/85" data-testid="offer-free-limit-note">
-              <Info className="mt-0.5 h-4 w-4 shrink-0" /> Free plan: {left} of {limit} offers left this month. Chat and payments need Business Pro.
+              <Info className="mt-0.5 h-4 w-4 shrink-0" /> Free plan: you can contact {limit} creators ({left} left). Chatting with them is free; paying in the app needs Business Pro.
             </p>
           )}
           <button type="submit" disabled={busy} className="cta flex h-[52px] w-full items-center justify-center gap-2 rounded-full font-extrabold disabled:opacity-60" data-testid="offer-submit-button">

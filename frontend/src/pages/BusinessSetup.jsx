@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { track } from "@/lib/track";
 import { toast } from "sonner";
 import { UtensilsCrossed, Shirt, Sparkles, Dumbbell, Home, GraduationCap, Cpu, ShoppingBag, Megaphone, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ export default function BusinessSetup() {
   const editing = !!me.business;
   const [f, setF] = useState({ ...BLANK, ...(me.business || {}) });
   const [step, setStep] = useState(() => (params.get("step") === "1" ? 1 : 0));
+  useEffect(() => { track(`Business setup · Step ${step + 1}`); }, [step]);
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v?.target ? v.target.value : v }));
   const valid = [f.company.trim().length >= 2 && f.industry && f.city, !!f.budget && f.need_plans.length > 0];

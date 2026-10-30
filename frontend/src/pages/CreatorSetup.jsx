@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { track } from "@/lib/track";
 import { toast } from "sonner";
 import { PostsEditor } from "@/components/PostsEditor";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ export default function CreatorSetup() {
   const [upi, setUpi] = useState(me.user.payout_upi || "");
   const [params] = useSearchParams();
   const [step, setStep] = useState(() => Math.min(2, Number(params.get("step")) || 0));
+  useEffect(() => { track(`Creator setup · Step ${step + 1}`); }, [step]);
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v?.target ? v.target.value : v }));
 
