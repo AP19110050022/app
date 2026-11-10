@@ -6,6 +6,7 @@ import { inr } from "@/lib/api";
 import { useMe } from "@/context/MeContext";
 import { H1, Spinner, useAdminData } from "@/pages/admin/bits";
 import { Growth } from "@/pages/admin/Growth";
+import { SignInHealth } from "@/pages/admin/SignInHealth";
 import { Journey } from "@/pages/admin/Journey";
 
 const Card = ({ icon: Icon, label, value, sub, testid, big }) => (
@@ -58,6 +59,7 @@ export default function AdminDashboard() {
           <Card icon={CheckCircle2} label="Completed deals" value={s.completed_deals} testid="stat-completed-deals" />
         </div>
         <Growth />
+        <SignInHealth />
         <Journey range={range} />
       </>)}
     </div>

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useApi, publicApi } from "@/lib/api";
+import { authEvent } from "@/lib/track";
 
 const MeCtx = createContext(null);
 
@@ -15,8 +16,10 @@ export function MeProvider({ children }) {
       const { data } = await api.get("/me");
       setMe(data);
       setError(false);
+      authEvent("signed_in");
     } catch (e) {
-      if (e?.response?.data?.detail === "account_blocked") setBlocked(true);
+      if (e?.response?.data?.detail === "account_blocked") { setBlocked(true); authEvent("blocked"); }
+      else authEvent("me_failed");
       setError(true);
     }
   }, [api]);

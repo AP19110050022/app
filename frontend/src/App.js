@@ -19,7 +19,7 @@ import Saved from "@/pages/Saved";
 import Profile from "@/pages/Profile";
 import AdminShell from "@/pages/admin/AdminShell";
 import Pricing from "@/pages/admin/Pricing";
-import { RouteTracker } from "@/lib/track";
+import { RouteTracker, authEvent } from "@/lib/track";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import Approvals from "@/pages/admin/Approvals";
 import AdminUsers from "@/pages/admin/Users";
@@ -34,17 +34,23 @@ import Posts from "@/pages/Posts";
 import Jobs from "@/pages/Jobs";
 import BusinessProfile from "@/pages/BusinessProfile";
 
+const SignedOut = ({ to }) => {
+  const at = Number(sessionStorage.getItem("hmf_auth_attempt") || 0);
+  if (at && Date.now() - at < 180000) authEvent("bounced");
+  return <Navigate to={to} replace />;
+};
+
 const Protected = () => (
   <>
     <Show when="signed-in"><MeProvider><AppShell /></MeProvider></Show>
-    <Show when="signed-out"><Navigate to="/" replace /></Show>
+    <Show when="signed-out"><SignedOut to="/" /></Show>
   </>
 );
 
 const ProtectedAdmin = () => (
   <>
     <Show when="signed-in"><MeProvider><AdminShell /></MeProvider></Show>
-    <Show when="signed-out"><Navigate to="/sign-in" replace /></Show>
+    <Show when="signed-out"><SignedOut to="/sign-in" /></Show>
   </>
 );
 

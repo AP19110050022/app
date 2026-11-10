@@ -1,4 +1,6 @@
 import { SignIn, SignUp } from "@clerk/react";
+import { useEffect } from "react";
+import { authEvent } from "@/lib/track";
 import { ArrowLeft, Video, IndianRupee, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/Logo";
@@ -9,7 +11,9 @@ const Chip = ({ icon: Icon, text, delay }) => (
   </span>
 );
 
-const Shell = ({ children, testid, title }) => (
+const Shell = ({ children, testid, title }) => {
+  useEffect(() => { authEvent("signin_page"); sessionStorage.setItem("hmf_auth_attempt", String(Date.now())); }, []);
+  return (
   <div className="min-h-screen text-white" data-testid={testid}>
     <Link to="/" aria-label="Back to home" title="Back to home" className="fixed left-4 top-4 z-50 grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-white/10 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
       <ArrowLeft className="h-5 w-5" />
@@ -28,7 +32,8 @@ const Shell = ({ children, testid, title }) => (
       <div>{children}</div>
     </div>
   </div>
-);
+  );
+};
 
 export const SignInPage = () => (
   <Shell testid="sign-in-page" title={<>Be the face of a brand.<br />Or find yours.</>}>

@@ -23,6 +23,13 @@ export const track = (page) => {
   publicApi.post("/track", { session_id: sessionId(), page }).catch(() => {});
 };
 
+export const authEvent = (kind) => {
+  const key = `hmf_auth_${kind}`;
+  if (sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, "1");
+  publicApi.post("/auth-events", { session_id: sessionId(), kind, host: window.location.host }).catch(() => {});
+};
+
 export function RouteTracker() {
   const { pathname } = useLocation();
   useEffect(() => {

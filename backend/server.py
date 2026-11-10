@@ -469,6 +469,19 @@ async def track(body: TrackIn):
     return {"ok": True}
 
 
+class AuthEventIn(BaseModel):
+    session_id: str = Field(min_length=6, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    kind: Literal["signin_page", "signed_in", "me_failed", "bounced", "blocked"]
+    host: str = Field("", max_length=100, pattern=r"^[A-Za-z0-9.:-]*$")
+
+
+@api.post("/auth-events")
+async def auth_event(body: AuthEventIn):
+    await db.auth_events.update_one({"session_id": body.session_id, "kind": body.kind},
+                                    {"$setOnInsert": {**body.model_dump(), "at": iso()}}, upsert=True)
+    return {"ok": True}
+
+
 @api.post("/creators/{creator_id}/view")
 async def view_creator(creator_id: str, member: dict = Depends(current_member)):
     if creator_id == member["user_id"] or not await db.creators.find_one({"user_id": creator_id}, {"_id": 1}):
@@ -1523,6 +1536,24 @@ async def admin_journey(range: Literal["today", "7d", "30d", "all"] = "7d", _: d
             "pages": sorted(rows, key=lambda r: -r["exits"])[:40]}
 
 
+@api.get("/admin/signin-health")
+async def admin_signin_health(days: int = Query(14, ge=1, le=90), _: dict = Depends(admin_dep)):
+    start = (now() - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    keys = ("signin_page", "signed_in", "me_failed", "bounced", "blocked")
+    series = {(start + timedelta(days=i)).date().isoformat(): dict.fromkeys(keys, 0) for i in range(days)}
+    hosts: dict = {}
+    async for e in db.auth_events.find({"at": {"$gte": start.isoformat()}}, {"_id": 0}):
+        if _day(e["at"]) in series:
+            series[_day(e["at"])][e["kind"]] += 1
+        h = hosts.setdefault(e.get("host") or "unknown", {"host": e.get("host") or "unknown", **dict.fromkeys(keys, 0)})
+        h[e["kind"]] += 1
+    rows = [{"date": k, **v, "failed": v["me_failed"] + v["bounced"]} for k, v in series.items()]
+    today = rows[-1]
+    tries = today["signed_in"] + today["failed"]
+    return {"days": rows, "hosts": sorted(hosts.values(), key=lambda h: -(h["me_failed"] + h["bounced"])),
+            "today_fail_rate": round(100 * today["failed"] / tries) if tries else 0}
+
+
 @api.get("/admin/log")
 async def admin_activity(_: dict = Depends(admin_dep)):
     return await db.admin_log.find({}, {"_id": 0}).sort("at", -1).to_list(300)
@@ -1543,6 +1574,8 @@ async def startup():
     await db.admin_invites.create_index("email", unique=True)
     await db.profile_views.create_index([("creator_id", 1), ("viewer_id", 1), ("day", 1)], unique=True)
     await db.events.create_index("at")
+    await db.auth_events.create_index([("session_id", 1), ("kind", 1)], unique=True)
+    await db.auth_events.create_index("at")
     async for d in db.deals.find({"payout_status": "ready"}, {"_id": 0, "id": 1}):
         await release_payout(d["id"])
     if not await db.creators.find_one({"is_sample": True}):
