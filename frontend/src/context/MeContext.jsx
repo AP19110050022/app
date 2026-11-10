@@ -17,9 +17,10 @@ export function MeProvider({ children }) {
       setMe(data);
       setError(false);
       authEvent("signed_in");
+      sessionStorage.removeItem("hmf_auth_attempt");
     } catch (e) {
       if (e?.response?.data?.detail === "account_blocked") { setBlocked(true); authEvent("blocked"); }
-      else authEvent("me_failed");
+      else if (!sessionStorage.getItem("hmf_auth_signed_in")) authEvent("me_failed");
       setError(true);
     }
   }, [api]);

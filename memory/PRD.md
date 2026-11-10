@@ -33,6 +33,8 @@ One account, + chooser (creator 3 steps / business 2 steps); 3 plans Per Video /
 
 - Iteration 6 (live sign-in loop on www.hireavatar.co): Clerk fallback redirect now /app; "We couldn't finish signing you in" screen with Try again / Sign out (app + admin); sign-in-unavailable screen with Try again; apex hireavatar.co → www redirect in index.html. Production RCA requested from deployer (Clerk domain/allowed origins, backend URL on custom domain). Needs re-publish; not yet verified live.
 
+- Iteration 7: Sign-in health check (auth_events: login page, signed in, couldn't finish, sent back to login, blocked; per day in IST and per web address; red alert when today's failure rate ≥20%). Live loop root cause (deployer): Emergent-managed production Clerk instance still bound to brandface.emergent.host — needs Emergent support (support@emergent.sh) to add www.hireavatar.co/hireavatar.co; user should enable root domain redirect in Deployment → Domains.
+
 ## Backlog
 - P2 (admin): growth charts, spreadsheet export, broadcast announcements, verified-badge control
 - P3 (admin): finer helper roles, auto-flagging, daily admin email summary

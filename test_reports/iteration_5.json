@@ -1,0 +1,40 @@
+{
+  "summary": "Focused test of Sign-In Health Check. Backend: 14/14 pytest pass (POST /api/auth-events accepts all 5 kinds, dedups per session+kind, returns 422 for bad kind/session_id/host/missing fields; GET /api/admin/signin-health returns 401 without a token, 403 for a member, and 200 for an admin with days=7/14/30; checked series length, today's date, failed=me_failed+bounced, host counts, the today_fail_rate formula, and 422 for days=0/91). Frontend: /sign-in sends signin_page; a ticket sign-in sends signed_in once per session and not again on reload; the admin dashboard shows admin-signin-health with signin-today, signin-chart and signin-hosts; the 7/14/30 switch refetches (7 and 10 x-ticks); growth and journey still render. Regression: sign-in page, Discover after sign-in, chat list and DealRoom (chat-receipt shows 'Sent' check icon) all OK. Found 1 logic bug: deliberate logout is counted as 'bounced'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth-events", "issue": "Public and unauthenticated, with no rate limit. Anyone can post unlimited random session_ids and inflate the failure metrics or flip the red alert."},
+      {"endpoint": "POST /api/auth-events", "issue": "Two identical requests sent at the same moment can make update_one(upsert) hit the unique (session_id, kind) index and raise DuplicateKeyError, which returns a 500. Catch DuplicateKeyError and return ok."},
+      {"endpoint": "GET /api/admin/signin-health", "issue": "Days and 'today' use UTC boundaries, while the admins are in IST. Between 00:00 and 05:30 IST, today's fail rate covers yesterday's IST evening."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Bounce detection (App.js SignedOut)", "issue": "False positive, reproduced: sign in, then click Settings > Log out (profile-logout-button) within 3 minutes. The app sends kind='bounced' in the same session that already sent 'signed_in'. hmf_auth_attempt is never cleared after a successful sign-in, so every normal logout (and the 6s blocked auto-signout) shortly after login counts as a sign-in loop and inflates 'failed'.", "affected_selectors": ["[data-testid='profile-logout-button']", "[data-testid='admin-signin-health']"]},
+      {"flow": "AuthPages Shell", "issue": "Shell is shared by SignIn and SignUp, so visits to /sign-up are also recorded as signin_page. Probably fine, but the 'Login page' column also counts sign-ups."},
+      {"flow": "MeContext me_failed", "issue": "The 30s /me poll can send me_failed after signed_in in the same session (one transient error), so that session counts as both a success and a failure."}
+    ],
+    "design_issues": [
+      {"screen": "Admin dashboard > Sign-in health > By web address", "issues": ["Long hosts are cut off (e.g. 'brandface--8c51lg3n.p...') with no title tooltip. Add title={x.host}."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter5_signin_health.py", "/app/backend/tests/ui_setup_iter5.py", "/app/test_reports/pytest/pytest_iter5.xml"],
+  "action_items": [
+    "In MeContext, on successful /me, also call sessionStorage.removeItem('hmf_auth_attempt'). Optionally skip 'bounced' when hmf_auth_signed_in is already set. This stops logouts being counted as sign-in loops.",
+    "Catch DuplicateKeyError in auth_event so concurrent duplicate posts cannot return a 500.",
+    "Consider basic rate limiting or abuse protection on the public /api/auth-events endpoint.",
+    "Optional: compute days in IST (Asia/Kolkata) for the admin view; add a title tooltip on truncated host cells."
+  ],
+  "critical_code_review_comments": [
+    "SignedOut calls authEvent during render, which is a side effect in render. Harmless because it is deduped, but better in a useEffect.",
+    "admin_signin_health filters with a string comparison of ISO timestamps. That works only because every 'at' value is UTC isoformat with the same offset, so keep iso() consistent."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter5_signin_health.py", "/app/backend/tests/ui_setup_iter5.py"],
+  "success_rate": {"backend": "100%", "frontend": "95% (1 metric-accuracy logic bug)"},
+  "seed_data_creation": "Temporary: iter4 profiles for brand/creator test users, one chat deal plus message, and auth_events/events from 4 browser sessions and the pytest sessions. All deleted by id/session_id, including TEST_hc1. The auth_events collection is empty afterwards. ui_setup_iter4.py clean was run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "From /app/memory/test_credentials.md (admin/brand/creator +clerk_test users via sign-in tickets). Unchanged.",
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_iter5_signin_health.py -n 0 (it cleans its own sessions and TEST_hc1). For UI: python tests/ui_setup_iter4.py (profiles plus tickets), then optionally python tests/ui_setup_iter5.py (chat deal plus fresh admin/brand tickets). Open tickets at /sign-in?__clerk_ticket=<t>. Read hmf_sid from sessionStorage to get the browser session ids, then delete those auth_events/events afterwards. Sign-in via ticket sometimes skips the signin_page event because Clerk redirects before Shell mounts. To verify the bounce fix: log in, then within 3 minutes click profile-logout-button and check that no 'bounced' event is posted."
+}

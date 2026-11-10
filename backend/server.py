@@ -477,8 +477,11 @@ class AuthEventIn(BaseModel):
 
 @api.post("/auth-events")
 async def auth_event(body: AuthEventIn):
-    await db.auth_events.update_one({"session_id": body.session_id, "kind": body.kind},
-                                    {"$setOnInsert": {**body.model_dump(), "at": iso()}}, upsert=True)
+    try:
+        await db.auth_events.update_one({"session_id": body.session_id, "kind": body.kind},
+                                        {"$setOnInsert": {**body.model_dump(), "at": iso()}}, upsert=True)
+    except DuplicateKeyError:
+        pass
     return {"ok": True}
 
 
@@ -1538,13 +1541,15 @@ async def admin_journey(range: Literal["today", "7d", "30d", "all"] = "7d", _: d
 
 @api.get("/admin/signin-health")
 async def admin_signin_health(days: int = Query(14, ge=1, le=90), _: dict = Depends(admin_dep)):
-    start = (now() - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    ist = timedelta(hours=5, minutes=30)
+    start = (now() + ist - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
     keys = ("signin_page", "signed_in", "me_failed", "bounced", "blocked")
     series = {(start + timedelta(days=i)).date().isoformat(): dict.fromkeys(keys, 0) for i in range(days)}
     hosts: dict = {}
-    async for e in db.auth_events.find({"at": {"$gte": start.isoformat()}}, {"_id": 0}):
-        if _day(e["at"]) in series:
-            series[_day(e["at"])][e["kind"]] += 1
+    async for e in db.auth_events.find({"at": {"$gte": (start - ist).isoformat()}}, {"_id": 0}):
+        d = (datetime.fromisoformat(e["at"]) + ist).date().isoformat()
+        if d in series:
+            series[d][e["kind"]] += 1
         h = hosts.setdefault(e.get("host") or "unknown", {"host": e.get("host") or "unknown", **dict.fromkeys(keys, 0)})
         h[e["kind"]] += 1
     rows = [{"date": k, **v, "failed": v["me_failed"] + v["bounced"]} for k, v in series.items()]
