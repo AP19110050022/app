@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
 import { useClerk } from "@clerk/react";
-import { Compass, Plus, Briefcase, MessageCircle, User, Bell, Search, Loader2, Bookmark, ShieldCheck, Ban } from "lucide-react";
+import { ArrowLeft, Compass, Plus, Briefcase, MessageCircle, User, Bell, Search, Loader2, Bookmark, ShieldCheck, Ban } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { RoleChooser } from "@/components/RoleChooser";
 import { useMe } from "@/context/MeContext";
@@ -21,13 +21,14 @@ const IconBtn = ({ to, icon: Icon, badge, testid, label }) => (
   </Link>
 );
 
-export const TopBar = ({ me }) => (
+export const TopBar = ({ me, showBack }) => (
   <header className="topbar sticky top-0 z-30">
     <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
       <div className="flex items-center gap-2.5">
+        {showBack && <Link to="/app" data-testid="app-back-button" aria-label="Back to Discover" title="Back to Discover" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25"><ArrowLeft className="h-5 w-5" /></Link>}
         <Logo to="/app" />
         {me?.user?.active_mode && (
-          <span data-testid="mode-chip" className="hidden rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider sm:inline">{me.user.active_mode}</span>
+          <span data-testid="mode-chip" className="hidden rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider sm:inline">{me.user.active_mode === "creator" ? "presenter" : me.user.active_mode}</span>
         )}
       </div>
       <div className="flex items-center gap-2">
@@ -50,7 +51,7 @@ const BottomNav = ({ onPlus }) => (
             <n.icon className="h-[22px] w-[22px]" /><span>{n.label}</span>
           </NavLink>
         ) : (
-          <button key={i} onClick={onPlus} data-testid="nav-plus-fab" aria-label="Become a creator or hire"
+          <button key={i} onClick={onPlus} data-testid="nav-plus-fab" aria-label="Become a presenter or hire"
             className="cta grid h-[50px] w-[50px] place-items-center rounded-full transition-transform duration-200 hover:scale-105 active:scale-90">
             <Plus className="h-7 w-7" strokeWidth={2.6} />
           </button>
@@ -60,6 +61,20 @@ const BottomNav = ({ onPlus }) => (
   </nav>
 );
 
+export const SignInFailed = () => {
+  const { signOut } = useClerk();
+  return (
+    <div className="glass max-w-sm rounded-[28px] p-8 text-center" data-testid="signin-failed-screen">
+      <p className="text-xl font-extrabold">We couldn't finish signing you in</p>
+      <p className="mt-1 text-sm text-white/75">Please try again. If it keeps happening, sign out and sign in once more.</p>
+      <div className="mt-5 flex justify-center gap-2">
+        <button onClick={() => window.location.reload()} className="h-11 rounded-full bg-white px-6 text-sm font-extrabold text-[#3B25A8]" data-testid="signin-failed-retry">Try again</button>
+        <button onClick={() => signOut({ redirectUrl: "/sign-in" })} className="h-11 rounded-full bg-white/15 px-5 text-sm font-bold" data-testid="signin-failed-signout">Sign out</button>
+      </div>
+    </div>
+  );
+};
+
 export const BlockedScreen = () => {
   const { signOut } = useClerk();
   useEffect(() => { const t = setTimeout(() => signOut({ redirectUrl: "/" }), 6000); return () => clearTimeout(t); }, [signOut]);
@@ -68,7 +83,7 @@ export const BlockedScreen = () => {
       <div className="glass max-w-sm rounded-[28px] p-8">
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-rose-500/30"><Ban className="h-7 w-7" /></span>
         <p className="mt-4 text-xl font-extrabold">Your account is blocked</p>
-        <p className="mt-1 text-sm text-white/75">Our team blocked this account for breaking the HireMyFace rules. You're being signed out.</p>
+        <p className="mt-1 text-sm text-white/75">Our team blocked this account for breaking the HireAvatar rules. You're being signed out.</p>
         <button onClick={() => signOut({ redirectUrl: "/" })} className="mt-5 h-11 rounded-full bg-white px-6 text-sm font-extrabold text-[#3B25A8]" data-testid="blocked-signout-button">Sign out</button>
       </div>
     </div>
@@ -79,18 +94,20 @@ export default function AppShell() {
   const { me, error, blocked } = useMe();
   const [plus, setPlus] = useState(false);
   const { pathname } = useLocation();
+  const hasPageBack = /^\/app\/(creator\/[^/]+|business\/[^/]+|chat\/[^/]+|posts|settings|setup\/(creator|business))$/.test(pathname);
+  const showBack = pathname !== "/app" && !hasPageBack;
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   if (blocked) return <BlockedScreen />;
   if (!me) {
     return (
       <div className="grid min-h-screen place-items-center text-white" data-testid="app-loading">
-        {error ? <p className="text-white/70">Couldn't load your account. Refresh to try again.</p> : <Loader2 className="h-8 w-8 animate-spin" />}
+        {error ? <SignInFailed /> : <Loader2 className="h-8 w-8 animate-spin" />}
       </div>
     );
   }
   return (
     <div className="min-h-screen text-white">
-      <TopBar me={me} />
+      <TopBar me={me} showBack={showBack} />
       <main className="mx-auto max-w-6xl px-4 pb-32 pt-4 sm:px-6">
         <Outlet context={{ openPlus: () => setPlus(true) }} />
       </main>

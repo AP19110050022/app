@@ -34,7 +34,7 @@ export const Growth = () => {
           </Chart>
           <Chart title="New profiles & deals" total={`${sum("deals")} deals`} testid="chart-deals">
             <BarChart data={rows}><CartesianGrid stroke="rgba(255,255,255,.08)" vertical={false} /><XAxis dataKey="date" tickFormatter={fmt} {...axis} minTickGap={24} /><YAxis allowDecimals={false} width={28} {...axis} /><Tooltip {...tip} cursor={{ fill: "rgba(255,255,255,.06)" }} />
-              <Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="creators" name="Creators" stackId="a" fill="#7C5CFF" /><Bar dataKey="businesses" name="Businesses" stackId="a" fill="#3B82F6" /><Bar dataKey="deals" name="Deals" fill="#5CE0A0" radius={[4, 4, 0, 0]} /></BarChart>
+              <Legend wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="creators" name="Presenters" stackId="a" fill="#7C5CFF" /><Bar dataKey="businesses" name="Businesses" stackId="a" fill="#3B82F6" /><Bar dataKey="deals" name="Deals" fill="#5CE0A0" radius={[4, 4, 0, 0]} /></BarChart>
           </Chart>
           <Chart title="Platform earnings" total={inr(sum("earnings"))} testid="chart-earnings">
             <AreaChart data={rows}><defs><linearGradient id="ge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5CE0A0" stopOpacity={0.7} /><stop offset="1" stopColor="#5CE0A0" stopOpacity={0} /></linearGradient></defs>

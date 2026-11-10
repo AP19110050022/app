@@ -9,8 +9,8 @@ import { H1, Spinner, useAdminData } from "@/pages/admin/bits";
 const FIELDS = [
   ["pro_price", "Business Pro price (₹)", Crown, "What a business pays for each Pro period"],
   ["pro_days", "Pro period (days)", CalendarDays, "How long one Pro payment lasts"],
-  ["fee_pct", "Service fee on paid deals (%)", Percent, "Taken from the creator's payout"],
-  ["free_contacts", "Free creator contacts", MessageCircle, "Creators a free business can chat with or send offers to"],
+  ["fee_pct", "Service fee on paid deals (%)", Percent, "Taken from the presenter's payout"],
+  ["free_contacts", "Free presenter contacts", MessageCircle, "Presenters a business can chat with or send offers to"],
 ];
 
 export default function Pricing() {

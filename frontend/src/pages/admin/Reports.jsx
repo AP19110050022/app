@@ -10,13 +10,13 @@ import { Box, Btn, H1, Nothing, Pill, ReasonDialog, Row, Spinner, useAdminData, 
 const REASON = { fake_profile: "Fake profile", inappropriate: "Inappropriate content", scam: "Scam", no_show: "No-show", other: "Other", dispute: "Dispute" };
 const ACTIONS = {
   report: [["dismiss", "Dismiss"], ["warn", "Warn user"], ["remove", "Remove content", true], ["block", "Block user", true]],
-  dispute: [["release", "Release payout to creator"], ["refund", "Refund the business", true]],
+  dispute: [["release", "Release payout to presenter"], ["refund", "Refund the business", true]],
 };
 
 const Target = ({ r }) => {
   const t = r.target;
   if (!t) return <p className="text-sm text-white/60">This item no longer exists.</p>;
-  if (r.target_type === "creator") return <div className="flex items-center gap-3"><img src={t.photo} alt="" className="h-14 w-14 rounded-2xl object-cover" /><div><p className="font-bold">{t.name}</p><p className="text-xs text-white/65">{t.categories?.join(" · ")} · {t.city}</p><Link to={`/app/creator/${t.user_id}`} className="text-xs underline">Open profile</Link></div></div>;
+  if (r.target_type === "creator") return <div className="flex items-center gap-3"><img src={t.photo} alt="" className="h-14 w-14 rounded-2xl object-cover" /><div><p className="font-bold">{t.name}</p><p className="text-xs text-white/65">{t.categories?.join(" · ")} · {t.city}</p><Link to={`/app/creator/${t.user_id}`} className="text-xs underline">Open presenter profile</Link></div></div>;
   if (r.target_type === "business") return <div><p className="font-bold">{t.company}</p><p className="text-xs text-white/65">{t.industry} · {t.city}</p><p className="mt-1 text-sm">{t.description}</p></div>;
   if (r.target_type === "job") return <div><p className="font-bold">{t.title}</p><p className="text-xs text-white/65">{t.company} · {t.status}</p><p className="mt-1 text-sm">{t.description}</p></div>;
   return <div><p className="font-bold">{t.business_name} → {t.creator_name}</p><p className="text-xs text-white/65">{t.plan_label} · {inr(t.price)} · {t.status}</p><p className="mt-1 text-sm">{t.brief}</p>{t.delivery_link && <a href={t.delivery_link} target="_blank" rel="noreferrer" className="text-xs underline">Submitted work</a>}</div>;

@@ -67,7 +67,7 @@ export const FilterSheet = ({ filters, onApply }) => {
         </div>
         <div className="flex gap-3 px-6 py-4">
           <Button variant="ghost" className="gap-2 rounded-full text-white" onClick={() => setF(EMPTY_FILTERS)} data-testid="filters-reset-button"><RotateCcw className="h-4 w-4" />Reset</Button>
-          <button className="cta h-12 flex-1 rounded-full font-bold" onClick={() => { onApply(f); setOpen(false); }} data-testid="filters-apply-button">Show creators</button>
+          <button className="cta h-12 flex-1 rounded-full font-bold" onClick={() => { onApply(f); setOpen(false); }} data-testid="filters-apply-button">Show presenters</button>
         </div>
       </SheetContent>
     </Sheet>

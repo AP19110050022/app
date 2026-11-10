@@ -4,6 +4,7 @@ import { ArrowLeft, Bookmark, Grid3x3, Tag, Info, Star, Play, MessageSquare, Ins
 import { toast } from "sonner";
 import { OfferDialog } from "@/components/OfferDialog";
 import { ReportButton } from "@/components/ReportButton";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { PLANS } from "@/constants/options";
 import { useMe } from "@/context/MeContext";
 import { errMsg, inr } from "@/lib/api";
@@ -12,12 +13,15 @@ const isImg = (u) => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u) || u.startsWith("da
 const TABS = [["posts", "Posts", Grid3x3], ["prices", "Prices", Tag], ["about", "About", Info], ["reviews", "Reviews", Star]];
 const TONES = ["from-[#6C4CF1] to-[#3B82F6]", "from-[#FF5FA2] to-[#7C5CFF]", "from-[#14B8A6] to-[#6C4CF1]", "from-[#F59E0B] to-[#FF5FA2]"];
 
-const Posts = ({ c }) => {
+const Posts = ({ c, onOpenImage }) => {
   const items = [{ img: c.photo, label: "Profile" }, ...(c.intro_video ? [{ link: c.intro_video, label: "Intro" }] : []), ...(c.samples || []).map((s, i) => (isImg(s) ? { img: s, label: `Sample ${i + 1}` } : { link: s, label: `Sample ${i + 1}` }))];
   return (
     <div className="grid grid-cols-3 gap-[2px] sm:grid-cols-4" data-testid="creator-posts">
       {items.map((it, i) => it.img ? (
-        <div key={i} className="relative aspect-square overflow-hidden"><img src={it.img} alt="" className="h-full w-full object-cover" /><span className="absolute bottom-1.5 left-2 text-[11px] font-bold drop-shadow">{it.label}</span></div>
+        <button key={i} type="button" onClick={() => onOpenImage(it.img, it.label)} aria-label={`View ${it.label}`} className="relative aspect-square overflow-hidden" data-testid={`creator-image-${i}`}>
+          <img src={it.img} alt={it.label} className="h-full w-full object-cover" />
+          <span className="absolute bottom-1.5 left-2 text-[11px] font-bold drop-shadow">{it.label}</span>
+        </button>
       ) : (
         <a key={i} href={it.link} target="_blank" rel="noreferrer" data-testid={`creator-post-link-${i}`} className={`relative flex aspect-square flex-col items-center justify-center bg-gradient-to-br ${TONES[i % 4]} transition-opacity hover:opacity-90`}>
           <Play className="h-8 w-8 fill-white" /><span className="absolute bottom-1.5 left-2 text-[11px] font-bold">{it.label}</span><ExternalLink className="absolute right-2 top-2 h-3.5 w-3.5" />
@@ -41,7 +45,7 @@ const Prices = ({ c, own, onHire }) => (
         {!own && <button onClick={() => onHire(p.id)} data-testid={`hire-plan-${p.id}`} className={`mt-3 h-11 w-full rounded-full text-sm font-extrabold transition-transform active:scale-[.98] ${i === 0 ? "cta" : "bg-white text-[#3B25A8]"}`}>Hire for {p.label}</button>}
       </div>
     ))}
-    <p className="text-center text-xs text-white/60">Payment is held safely until you approve the finished work.</p>
+    <p className="text-center text-xs text-white/60">Businesses can send you an offer to start a conversation.</p>
   </div>
 );
 
@@ -78,6 +82,7 @@ export default function CreatorProfile() {
   const [tab, setTab] = useState("posts");
   const [offerPlan, setOfferPlan] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [imageViewer, setImageViewer] = useState(null);
 
   useEffect(() => {
     api.get(`/creators/${id}`).then((r) => setC(r.data)).catch(() => setMissing(true));
@@ -85,14 +90,14 @@ export default function CreatorProfile() {
     api.post(`/creators/${id}/view`).catch(() => {});
   }, [api, id]);
 
-  if (missing) return <div className="py-20 text-center" data-testid="creator-not-found"><p className="font-bold">This creator isn't available.</p><Link to="/app" className="text-white/70 underline">Back to discover</Link></div>;
+  if (missing) return <div className="py-20 text-center" data-testid="creator-not-found"><p className="font-bold">This presenter isn't available.</p><Link to="/app" className="text-white/70 underline">Back to discover</Link></div>;
   if (!c) return <div className="grid place-items-center py-20"><Loader2 className="h-7 w-7 animate-spin" /></div>;
   const own = c.user_id === me.user.user_id;
-  const toggleSave = async () => { await (saved ? api.delete(`/saved/${id}`) : api.post(`/saved/${id}`)); setSaved(!saved); toast.success(saved ? "Removed from saved" : "Saved"); };
+  const toggleSave = async () => { await (saved ? api.delete(`/saved/${id}`) : api.post(`/saved/${id}`)); setSaved(!saved); };
   const message = async () => {
     if (!me.business) return setOfferPlan(c.plans?.[0] || "per_video");
     try { const { data } = await api.post("/chats", { creator_id: id }); navigate(`/app/chat/${data.id}`); }
-    catch (e) { toast.error(errMsg(e)); if (e?.response?.status === 402) navigate("/app/upgrade"); }
+    catch (e) { toast.error(errMsg(e)); }
   };
 
   return (
@@ -132,7 +137,7 @@ export default function CreatorProfile() {
         ))}
       </div>
       <div className="pb-24">
-        {tab === "posts" && <Posts c={c} />}
+        {tab === "posts" && <Posts c={c} onOpenImage={(image, label) => setImageViewer({ image, label })} />}
         {tab === "prices" && <Prices c={c} own={own} onHire={setOfferPlan} />}
         {tab === "about" && <About c={c} />}
         {tab === "reviews" && <Reviews c={c} />}
@@ -143,6 +148,13 @@ export default function CreatorProfile() {
           <button onClick={() => setOfferPlan(c.plans?.[0] || "per_video")} className="cta h-[52px] flex-[1.4] truncate rounded-full px-4 font-extrabold" data-testid="sticky-send-offer">Hire {c.name.split(" ")[0]}</button>
         </div>
       )}
+      <Dialog open={!!imageViewer} onOpenChange={(isOpen) => !isOpen && setImageViewer(null)}>
+        <DialogContent className="flex h-[90vh] w-[96vw] max-w-none flex-col items-center justify-center border-white/15 bg-black/95 p-3 text-white sm:rounded-xl" data-testid="creator-image-viewer">
+          <DialogTitle className="sr-only">{imageViewer?.label || "Presenter photo"}</DialogTitle>
+          {imageViewer && <img src={imageViewer.image} alt={imageViewer.label} className="max-h-[80vh] max-w-full object-contain" />}
+          {imageViewer && <p className="text-sm font-bold text-white/80">{imageViewer.label}</p>}
+        </DialogContent>
+      </Dialog>
       {offerPlan && <OfferDialog creator={c} open={!!offerPlan} initialPlan={offerPlan} onOpenChange={(o) => !o && setOfferPlan(null)} />}
     </div>
   );

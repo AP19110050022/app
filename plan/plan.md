@@ -1,82 +1,56 @@
-# HireMyFace — Admin Panel
+# HireAvatar — Fix Sign-In on the Live Site (www.hireavatar.co)
 
-A private control room for running HireMyFace: approve creators, keep the platform safe, follow deals and money, and see how the business is doing.
-It has one main admin (the owner), who can add helper admins and remove them.
+People can't sign in on the live site. After they log in, they land back on the sign-in or sign-up page.
+This fix makes Google and email + password sign-in work on www.hireavatar.co, as they already do on the preview.
 
 ## Who it's for
-- **Main admin (owner):** full control, including adding and removing helper admins.
-- **Helper admins:** run daily moderation and support. They cannot add or remove admins, and they cannot block the main admin.
-- **Regular users** (creators and businesses) never see the admin panel. They only see the new "Report" option.
+- **Everyone using the live site:** creators, businesses and admins (including the main admin) who sign in at www.hireavatar.co.
 
 ## Core features and experience
+**1. Find the exact cause on the live site**
+- Check the live sign-in setup, which the preview doesn't show:
+  - which sign-in keys the live site uses
+  - which web addresses the sign-in service accepts
+  - where the live site sends its sign-in and app requests
+  - whether the live server rejects people right after they log in
+- The most likely cause: the live sign-in service was set up for the earlier address (brandface.emergent.host) and doesn't yet trust www.hireavatar.co. Or the site and its server run on different addresses, so the browser drops the sign-in session, the app thinks the person is signed out, and sends them back to the login page.
 
-**1. Dashboard (home of the admin panel)**
-- Number cards: total users, creators (live / pending / rejected), businesses, Pro subscribers, open jobs, active deals, completed deals.
-- Money: total paid by businesses, platform earnings (10% service fee plus Pro subscriptions), and paid out to creators.
-- Each number can be shown for today, the last 7 days, the last 30 days or all time.
-- "Needs attention" counters: creators waiting for approval, open reports, deals in dispute. Tapping one opens that list.
+**2. Fix it**
+- Make www.hireavatar.co a trusted address for sign-in, for both Google and email + password.
+- Make the live site keep the sign-in session on the same address the person is on. Then a successful login stays signed in, and they land in the app (Discover) instead of the login page.
+- Make hireavatar.co (without "www") open the www address, so sign-in always happens on one address.
+- Keep the earlier address brandface.emergent.host working as a backup.
 
-**2. Creator approvals**
-- A queue of new and edited creator profiles showing photo, categories, plans and prices, posts and location.
-- Approve or Reject. Rejecting needs a short reason, which the creator sees in a notification and on their profile.
-- Only approved creators appear in Discover (already the rule, kept as is).
+**3. Clear message instead of a loop**
+- If sign-in still fails for some reason, show a short message ("We couldn't finish signing you in. Try again.") with a Try again button, instead of silently going back to the login page.
+- A blocked account still sees the existing "Your account is blocked" screen.
 
-**3. Users**
-- Search by name or email. Filter by role (creator / business / both), status (active / blocked) and Pro.
-- Open any user to see their profile, jobs, deals, reports against them and payment history.
-- Block or Unblock with a reason. A blocked user is signed out, can't log in, and their profile, jobs and posts disappear everywhere. Their ongoing deals are paused.
-
-**4. Jobs and posts moderation**
-- A list of all jobs posted by businesses, plus creator posts (photos and reels).
-- Remove any job or post with a reason. The owner gets a notification.
-
-**5. Deals and payouts**
-- A list of all deals with business, creator, plan, amount, status and payment state.
-- **Payouts are released automatically:** once the business marks the work as approved, the creator's payout (amount minus the 10% fee) is released at once, with no admin step.
-- Admins can still see each payout and its status (pending, released, failed) and retry a failed one.
-- Disputed deals pause automatic payout until an admin resolves them.
-
-**6. Reports and disputes**
-- Users get a "Report" button on creator profiles, business profiles, jobs and deal chats, with a reason (fake profile, inappropriate content, scam, no-show, other) and an optional note.
-- On a paid deal, the business can "Raise a dispute" instead of approving the work.
-- Admins see open reports and disputes. They can read the deal chat, then resolve with one of these actions:
-  - dismiss
-  - warn the user
-  - remove the content
-  - block the user
-  - for disputes only: release the payout to the creator, or mark it refunded to the business
-- Both sides are notified of the outcome.
-
-**7. Admin team (main admin only)**
-- Add a helper admin by email. That person must already have a HireMyFace account; if not, they become admin as soon as they sign up with that email.
-- Remove a helper admin at any time.
-- An activity log of who did what and when (approved, blocked, removed, resolved, released), visible to all admins.
+**4. Confirm on the live site**
+- Sign in on www.hireavatar.co with Google and with email + password, on phone and desktop.
+- Each one must land in the app and stay signed in after a refresh.
+- The main admin must still see the Admin entry.
 
 ## User flow
-1. The main admin logs in and sees an "Admin" entry in the menu (hidden for everyone else).
-2. They land on the Dashboard, check the "Needs attention" counters, and tap into a queue.
-3. Creator approvals: review, then approve or reject with a reason.
-4. Reports: open one, review the content and chat, then take an action. The users are notified.
-5. Deals: follow payments. Payouts go out on their own when businesses approve the work; admins step in only on disputes or failed payouts.
-6. Admin team: the main admin adds a helper by email. The helper then sees the Admin menu, without the Team section.
+1. A person opens www.hireavatar.co and taps "Log in" or "Create account".
+2. They continue with Google, or enter their email and password.
+3. They land on Discover, signed in, and stay signed in when they refresh or come back later.
+4. If anything goes wrong, they see a clear message with a Try again button, not a loop.
 
 ## UI/UX feel
-- Same dark violet/blue social-app style as the rest of HireMyFace, but laid out for work: a side menu on desktop, tabs at the bottom on mobile.
-- Clear coloured status pills (pending, approved, rejected, blocked, disputed, released).
-- Every destructive action (block, remove, reject, refund) asks for confirmation and a reason.
-- Works fully on phone.
+- The sign-in and sign-up pages look the same as today: same dark violet style, Google button on top, email below.
+- No visible change except the friendly error message when something fails.
 
 ## Implementation phases
-- **Phase 1 — MVP (built now):** everything above, including the dashboard, creator approvals, users with block/unblock, jobs and posts removal, the deals list with automatic payout on business approval, reports and disputes, the admin team with main admin and helpers, and the activity log.
-- **Phase 2:** charts of growth over time, exporting lists to a spreadsheet, broadcast announcements to all users, and verified-badge control.
-- **Phase 3:** finer helper roles (for example "moderator only" or "payments only"), automatic flagging of suspicious profiles, and an email summary to admins each day.
+- **Phase 1 (built now):** find the cause on the live site, make www.hireavatar.co trusted for Google and email sign-in, keep sessions on the same address, send hireavatar.co to www, add the clear failure message, and re-publish so the fix goes live.
+- **Phase 2:** sign-in health check in the admin panel (failed sign-ins per day), and a "Signed in from a new device" notice for users.
+- **Phase 3:** extra sign-in options (phone number with OTP, Apple sign-in for the app-store version), and two-step verification for admins.
 
 ## Assumptions
-- No email was given, so the **main admin will be the first account that logs in after this update**. This can be changed to a specific email at any time.
-- Helper admins can do everything except manage the admin team and block admins.
-- Blocking hides all of the user's content and pauses their deals. Nothing is deleted, so unblocking restores everything.
-- Payouts go out automatically when the business approves the work. A raised dispute stops this until an admin decides.
-- Real money movement (payouts and refunds) depends on Razorpay keys. Until they are added, payouts and refunds are recorded in test mode (MOCKED) and shown as such in the panel.
-- Reports can be filed by any logged-in user. One user can report the same item only once.
-- Money figures are in INR. Platform earnings are the 10% fee on paid deals plus ₹999/month Pro subscriptions.
-- The existing admin features (creator approval, deals and payout view) are folded into this new panel, not kept separately.
+- The problem is only on the live site. The preview sign-in works and stays as it is.
+- Sign-in methods stay the same as today: Emergent-managed Google sign-in plus email and password. There's no separate built-in admin password account. The main admin stays ganeshreddypittu111@gmail.com.
+- Existing accounts and their data are kept. Nobody has to sign up again.
+- If the live sign-in service needs a setting only the account owner can change (for example a domain record at the domain provider), a short step-by-step note will be given to do it.
+- The fix needs a re-publish to reach www.hireavatar.co.
+- The earlier questions about the app stores and security audit aren't part of this fix:
+  - Google Play and the App Store need a mobile version of the app, which is a separate project.
+  - The security audit and the file and media storage requests are still pending and will be handled after sign-in works.

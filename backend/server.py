@@ -36,9 +36,10 @@ db = client[os.environ['DB_NAME']]
 
 app = FastAPI()
 api = APIRouter(prefix="/api")
-logger = logging.getLogger("hiremyface")
+logger = logging.getLogger("hireavatar")
 
 DEFAULT_PRICING = {"pro_price": 999, "pro_days": 30, "fee_pct": 10, "free_contacts": 3}
+DEAL_WORKFLOW_ENABLED = os.environ.get("DEAL_WORKFLOW_ENABLED", "false").lower() == "true"
 CLOSED_DEALS = ("declined", "cancelled", "completed", "refunded")
 PLANS = ("per_video", "part_time", "full_time")
 PlanT = Literal["per_video", "part_time", "full_time"]
@@ -165,7 +166,7 @@ class CreatorIn(BaseModel):
     languages: List[str] = Field(min_length=1, max_length=8)
     bio: str = Field("", max_length=500)
     intro_video: str = Field("", max_length=500)
-    samples: List[str] = Field(default_factory=list, max_length=12)
+    samples: List[str] = Field(default_factory=list, max_length=3)
     instagram: str = Field("", max_length=200)
     youtube: str = Field("", max_length=200)
     followers: int = Field(0, ge=0)
@@ -214,7 +215,7 @@ class VisibilityIn(BaseModel):
 
 
 class PostsIn(BaseModel):
-    posts: List[str] = Field(max_length=12)
+    posts: List[str] = Field(max_length=3)
 
 
 class NotifyPrefs(BaseModel):
@@ -333,15 +334,6 @@ async def contacts_used(uid: str) -> list:
     return await db.deals.distinct("creator_id", {"business_id": uid})
 
 
-async def check_contact(member: dict, creator_id: str):
-    if is_pro(member):
-        return
-    used = await contacts_used(member["user_id"])
-    limit = (await pricing())["free_contacts"]
-    if creator_id not in used and len(used) >= limit:
-        raise HTTPException(402, f"Free accounts can contact up to {limit} creators. Upgrade to Business Pro to contact more.")
-
-
 async def get_deal_for(deal_id: str, member: dict) -> dict:
     scope = {} if member["role"] in ADMIN_ROLES else {"$or": [{"business_id": member["user_id"]}, {"creator_id": member["user_id"]}]}
     deal = await db.deals.find_one({"id": deal_id, **scope}, {"_id": 0})
@@ -457,13 +449,13 @@ async def location_nearest(lat: float, lng: float):
 # ---------- public ----------
 @api.get("/")
 async def root():
-    return {"message": "HireMyFace API"}
+    return {"message": "HireAvatar API"}
 
 
 @api.get("/config")
 async def config():
     return {"payments_mode": "razorpay" if rzp_client() else "test", "razorpay_key_id": os.environ.get("RAZORPAY_KEY_ID", ""),
-            **await pricing()}
+            "deal_workflow_enabled": DEAL_WORKFLOW_ENABLED, **await pricing()}
 
 
 class TrackIn(BaseModel):
@@ -540,10 +532,16 @@ async def me(member: dict = Depends(current_member)):
 @api.patch("/me")
 async def update_me(body: MeUpdate, member: dict = Depends(current_member)):
     upd = {k: v for k, v in body.model_dump().items() if v is not None}
-    if upd.get("active_mode") == "creator" and not await db.creators.find_one({"user_id": member["user_id"]}):
-        raise HTTPException(400, "Create your creator profile first")
-    if upd.get("active_mode") == "business" and not await db.businesses.find_one({"user_id": member["user_id"]}):
-        raise HTTPException(400, "Create your business profile first")
+    if upd.get("active_mode") == "creator":
+        if not await db.creators.find_one({"user_id": member["user_id"]}):
+            raise HTTPException(400, "Create your creator profile first")
+        if await db.businesses.find_one({"user_id": member["user_id"]}):
+            raise HTTPException(409, "An account can have only one profile type. Delete your account to change types.")
+    if upd.get("active_mode") == "business":
+        if not await db.businesses.find_one({"user_id": member["user_id"]}):
+            raise HTTPException(400, "Create your business profile first")
+        if await db.creators.find_one({"user_id": member["user_id"]}):
+            raise HTTPException(409, "An account can have only one profile type. Delete your account to change types.")
     if upd:
         await db.users.update_one({"user_id": member["user_id"]}, {"$set": upd})
     if upd.get("payout_upi"):
@@ -567,6 +565,13 @@ async def delete_me(member: dict = Depends(current_member)):
 async def upsert_creator(body: CreatorIn, member: dict = Depends(current_member)):
     uid = member["user_id"]
     existing = await db.creators.find_one({"user_id": uid}, {"_id": 0})
+    if not existing:
+        if await db.businesses.find_one({"user_id": uid}):
+            raise HTTPException(409, "You already have a business profile. Delete your account to create a creator profile.")
+        claimed = await db.users.update_one({"user_id": uid, "account_type": {"$in": [None, "creator"]}},
+                                            {"$set": {"account_type": "creator"}})
+        if not claimed.matched_count:
+            raise HTTPException(409, "You already have a business profile. Delete your account to create a creator profile.")
     data = with_plans(with_geo(body.model_dump()))
     if existing:
         relist = existing.get("status") == "approved" and (data["name"] != existing.get("name") or data["photo"] != existing.get("photo"))
@@ -585,6 +590,13 @@ async def upsert_creator(body: CreatorIn, member: dict = Depends(current_member)
 async def upsert_business(body: BusinessIn, member: dict = Depends(current_member)):
     uid = member["user_id"]
     existing = await db.businesses.find_one({"user_id": uid})
+    if not existing:
+        if await db.creators.find_one({"user_id": uid}):
+            raise HTTPException(409, "You already have a creator profile. Delete your account to create a business profile.")
+        claimed = await db.users.update_one({"user_id": uid, "account_type": {"$in": [None, "business"]}},
+                                            {"$set": {"account_type": "business"}})
+        if not claimed.matched_count:
+            raise HTTPException(409, "You already have a creator profile. Delete your account to create a business profile.")
     await db.businesses.update_one({"user_id": uid}, {"$set": {**with_geo(body.model_dump()), "updated_at": iso()},
                                                      "$setOnInsert": {"user_id": uid, "live": True, "created_at": iso()}}, upsert=True)
     if not existing:
@@ -778,7 +790,6 @@ async def create_deal(body: OfferIn, member: dict = Depends(current_member)):
         raise HTTPException(400, f"{creator['name']} is offline right now and isn't taking new offers")
     if not creator.get(RATE_FIELD[body.plan]):
         raise HTTPException(400, f"{creator['name']} doesn't offer the {PLAN_LABEL[body.plan]} plan")
-    await check_contact(member, body.creator_id)
     offer = {"plan": body.plan, "plan_label": PLAN_LABEL[body.plan], "brief": body.brief, "start_date": body.start_date,
              "price": body.price, "counter_price": None, "status": "pending", "updated_at": iso()}
     thread = await db.deals.find_one_and_update({"business_id": uid, "creator_id": body.creator_id, "status": "chat"},
@@ -787,7 +798,7 @@ async def create_deal(body: OfferIn, member: dict = Depends(current_member)):
     if thread:
         await notify(body.creator_id, "offer", f"New {offer['plan_label']} offer from {business['company']} for ₹{body.price:,}", f"/app/chat/{thread['id']}")
         return thread
-    deal = {"id": new_id(), "free_chat": not is_pro(member), "business_id": uid, "creator_id": body.creator_id, "business_name": business["company"],
+    deal = {"id": new_id(), "free_chat": True, "business_id": uid, "creator_id": body.creator_id, "business_name": business["company"],
             "business_logo": business.get("logo", ""), "creator_name": creator["name"], "creator_photo": creator["photo"],
             "plan": body.plan, "plan_label": PLAN_LABEL[body.plan], "brief": body.brief, "start_date": body.start_date,
             "price": body.price, "counter_price": None, "status": "pending", "delivery_link": "", "payout_status": None,
@@ -816,11 +827,10 @@ async def start_chat(body: ChatIn, member: dict = Depends(current_member)):
     creator = await db.creators.find_one({"user_id": body.creator_id, "status": "approved", **HIDE}, {"_id": 0})
     if not creator:
         raise HTTPException(404, "Creator not found")
-    await check_contact(member, body.creator_id)
     deal = {"id": new_id(), "business_id": uid, "creator_id": body.creator_id, "business_name": business["company"],
             "business_logo": business.get("logo", ""), "creator_name": creator["name"], "creator_photo": creator["photo"],
             "plan": None, "plan_label": "Chat", "brief": "", "start_date": "", "price": 0, "counter_price": None, "status": "chat",
-            "free_chat": not is_pro(member), "delivery_link": "", "payout_status": None, "rating": None,
+            "free_chat": True, "delivery_link": "", "payout_status": None, "rating": None,
             "history": [{"status": "chat", "at": iso()}], "created_at": iso(), "updated_at": iso()}
     await db.deals.insert_one({**deal})
     return {"id": deal["id"]}
@@ -838,7 +848,7 @@ async def list_deals(side: Literal["business", "creator", "all"] = "all", member
 async def get_deal(deal_id: str, member: dict = Depends(current_member)):
     deal = await get_deal_for(deal_id, member)
     biz_user = await db.users.find_one({"user_id": deal["business_id"]}, {"_id": 0})
-    chat_open = bool(biz_user and (is_pro(biz_user) or deal.get("free_chat")))
+    chat_open = bool(biz_user)
     return {**deal, "chat_open": chat_open, "is_business": deal["business_id"] == member["user_id"],
             "is_creator": deal["creator_id"] == member["user_id"]}
 
@@ -846,6 +856,8 @@ async def get_deal(deal_id: str, member: dict = Depends(current_member)):
 @api.post("/deals/{deal_id}/action")
 async def deal_action(deal_id: str, body: DealAction, member: dict = Depends(current_member)):
     deal = await get_deal_for(deal_id, member)
+    if not DEAL_WORKFLOW_ENABLED:
+        raise HTTPException(409, "Deal actions are temporarily disabled. Offers and chat are still available.")
     uid, a, st = member["user_id"], body.action, deal["status"]
     is_b, is_c = deal["business_id"] == uid, deal["creator_id"] == uid
     if deal.get("paused"):
@@ -908,6 +920,8 @@ async def deal_action(deal_id: str, body: DealAction, member: dict = Depends(cur
 @api.post("/deals/{deal_id}/rate")
 async def rate_deal(deal_id: str, body: RatingIn, member: dict = Depends(current_member)):
     deal = await get_deal_for(deal_id, member)
+    if not DEAL_WORKFLOW_ENABLED:
+        raise HTTPException(409, "Ratings are temporarily disabled.")
     if deal["business_id"] != member["user_id"] or deal["status"] not in ("delivered", "completed") or deal.get("rating"):
         raise HTTPException(400, "You can rate once the work is delivered")
     await db.deals.update_one({"id": deal_id}, {"$set": {"rating": body.model_dump(), "rated_at": iso()}})
@@ -924,7 +938,11 @@ async def rate_deal(deal_id: str, body: RatingIn, member: dict = Depends(current
 @api.get("/deals/{deal_id}/messages")
 async def list_messages(deal_id: str, member: dict = Depends(current_member)):
     deal = await get_deal_for(deal_id, member)
+    await db.messages.update_many({"deal_id": deal_id, "sender_id": {"$ne": member["user_id"]}, "seen": {"$ne": True}},
+                                  {"$set": {"seen": True, "seen_at": iso()}})
     msgs = await db.messages.find({"deal_id": deal_id}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    for msg in msgs:
+        msg["seen"] = bool(msg.get("seen"))
     if deal["status"] not in PAID_STATES:
         for m in msgs:
             m["text"] = mask(m["text"])
@@ -935,8 +953,8 @@ async def list_messages(deal_id: str, member: dict = Depends(current_member)):
 async def send_message(deal_id: str, body: MessageIn, member: dict = Depends(current_member)):
     deal = await get_deal_for(deal_id, member)
     biz_user = await db.users.find_one({"user_id": deal["business_id"]}, {"_id": 0})
-    if not (biz_user and (is_pro(biz_user) or deal.get("free_chat"))):
-        raise HTTPException(402, "Chat unlocks when the business upgrades to Business Pro")
+    if not biz_user:
+        raise HTTPException(404, "Business account not found")
     if deal["status"] in ("declined", "cancelled"):
         raise HTTPException(400, "This deal is closed")
     if deal.get("paused"):
@@ -945,7 +963,7 @@ async def send_message(deal_id: str, body: MessageIn, member: dict = Depends(cur
     if not is_b and deal["creator_id"] != member["user_id"]:
         raise HTTPException(403, "Only the business and the creator can post in this chat")
     msg = {"id": new_id(), "deal_id": deal_id, "sender_id": member["user_id"],
-           "sender_name": deal["business_name"] if is_b else deal["creator_name"], "text": body.text.strip(), "created_at": iso()}
+            "sender_name": deal["business_name"] if is_b else deal["creator_name"], "text": body.text.strip(), "seen": False, "created_at": iso()}
     await db.messages.insert_one({**msg})
     await db.deals.update_one({"id": deal_id}, {"$set": {"updated_at": iso(), "last_message": body.text[:80]}})
     await notify(deal["creator_id"] if is_b else deal["business_id"], "message", f"New message from {msg['sender_name']}", f"/app/chat/{deal_id}")
@@ -971,16 +989,14 @@ async def read_notifications(member: dict = Depends(current_member)):
 async def create_order(body: OrderIn, member: dict = Depends(current_member)):
     uid = member["user_id"]
     prices = await pricing()
+    if body.kind == "deal" and not DEAL_WORKFLOW_ENABLED:
+        raise HTTPException(409, "Deal payments are temporarily disabled. Offers and chat are still available.")
     if body.kind == "pro":
-        if not await db.businesses.find_one({"user_id": uid}):
-            raise HTTPException(400, "Create your business profile first")
-        amount, desc, deal_id = prices["pro_price"], f"Business Pro – {prices['pro_days']} days", None
+        raise HTTPException(400, "Subscriptions are not available")
     else:
         deal = await get_deal_for(body.deal_id or "", member)
         if deal["business_id"] != uid or deal["status"] != "accepted":
             raise HTTPException(400, "This deal can't be paid right now")
-        if not is_pro(member):
-            raise HTTPException(402, "Upgrade to Business Pro to pay in the app")
         amount, desc, deal_id = deal["price"], f"{deal['plan_label']} – {deal['creator_name']}", deal["id"]
     pay = {"id": new_id(), "user_id": uid, "kind": body.kind, "deal_id": deal_id, "amount": amount, "description": desc,
            "fee": round(amount * prices["fee_pct"] / 100) if body.kind == "deal" else amount, "fee_pct": prices["fee_pct"],
@@ -1004,6 +1020,10 @@ async def verify_payment(body: VerifyIn, member: dict = Depends(current_member))
         raise HTTPException(404, "Payment not found")
     if pay["status"] == "paid":
         return {"ok": True}
+    if pay["kind"] == "deal" and not DEAL_WORKFLOW_ENABLED:
+        raise HTTPException(409, "Deal payment verification is temporarily disabled.")
+    if pay["kind"] == "pro":
+        raise HTTPException(400, "Subscriptions are not available")
     if pay["mode"] == "razorpay":
         secret = os.environ.get("RAZORPAY_KEY_SECRET", "")
         expected = hmac.new(secret.encode(), f"{pay['gateway_order_id']}|{body.razorpay_payment_id}".encode(), hashlib.sha256).hexdigest()
@@ -1369,7 +1389,7 @@ async def admin_resolve(report_id: str, body: ResolveIn, admin: dict = Depends(a
                "refund": "the payment was refunded to the business"}[a]
     await notify(r["reporter_id"], "approval", f"We reviewed your {'dispute' if r['kind'] == 'dispute' else 'report'} on {r['target_label']}: {outcome}.", "/app/notifications")
     if a != "dismiss" and a != "block":
-        await notify(r["target_user_id"], "approval", f"HireMyFace team: {note}" if a == "warn" else f"Our team reviewed {r['target_label']}: {outcome}. {note}", "/app/notifications")
+        await notify(r["target_user_id"], "approval", f"HireAvatar team: {note}" if a == "warn" else f"Our team reviewed {r['target_label']}: {outcome}. {note}", "/app/notifications")
     await log_action(admin, f"resolved ({a})", r["target_label"], note)
     return {"ok": True}
 
@@ -1392,7 +1412,7 @@ async def admin_add(body: TeamIn, admin: dict = Depends(owner_dep)):
         if user.get("blocked"):
             raise HTTPException(400, "Unblock this account first")
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"role": "admin"}})
-        await notify(user["user_id"], "approval", "You're now a HireMyFace admin. Open the Admin panel from the menu.", "/admin")
+        await notify(user["user_id"], "approval", "You're now a HireAvatar admin. Open the Admin panel from the menu.", "/admin")
         result = "added"
     else:
         await db.admin_invites.update_one({"email": email}, {"$setOnInsert": {"email": email, "invited_by": admin["user_id"], "created_at": iso()}}, upsert=True)

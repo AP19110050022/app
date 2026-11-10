@@ -44,7 +44,7 @@ export default function Approvals() {
   const [rejecting, setRejecting] = useState(null);
   return (
     <div data-testid="admin-approvals">
-      <H1 sub="New and edited creator profiles">Creator approvals</H1>
+      <H1 sub="New and edited presenter profiles">Presenter approvals</H1>
       <div className="mb-4 max-w-md"><Seg value={status} onChange={setStatus} testid="approvals-filter" options={[["pending", "Waiting"], ["approved", "Approved"], ["rejected", "Rejected"]]} /></div>
       {!list ? <Spinner /> : list.length === 0 ? <div className="glass rounded-[22px]"><Nothing t="Nothing here right now" testid="approvals-empty" /></div> : (
         <div className="grid gap-3 lg:grid-cols-2">
@@ -52,7 +52,7 @@ export default function Approvals() {
         </div>
       )}
       <ReasonDialog open={!!rejecting} onOpenChange={(o) => !o && setRejecting(null)} danger cta="Reject profile" testid="reject-dialog"
-        title={`Reject ${rejecting?.name || ""}?`} text="The creator sees this reason in a notification and on their profile."
+        title={`Reject ${rejecting?.name || ""}?`} text="The presenter sees this reason in a notification and on their profile."
         onConfirm={(reason) => run("patch", `/admin/creators/${rejecting.user_id}`, { status: "rejected", reason }, "Profile rejected")} />
     </div>
   );

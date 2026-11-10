@@ -1,5 +1,5 @@
-# HireMyFace API regression: auth/roles, profiles, offers & free limit, Pro upgrade, deal lifecycle, chat masking, admin, notifications
-# NOTE: ordered stateful flow - run serially: pytest tests/test_hiremyface_api.py -n 0
+# HireAvatar API regression: auth/roles, profiles, offers, deal lifecycle, chat, admin, notifications
+# NOTE: ordered stateful flow - run this module serially with -n 0
 import os
 import sys
 from pathlib import Path
@@ -81,6 +81,10 @@ class TestProfiles:
         r = requests.put(f"{API}/businesses/me", json=body, headers=H(tok["brand"]))
         assert r.status_code == 200 and r.json()["company"] == "TEST_Chai Point Cafe"
         assert requests.get(f"{API}/me", headers=H(tok["brand"])).json()["business"]["city"] == "Bengaluru"
+        creator = {"name": "TEST_Brand Creator", "photo": "https://images.unsplash.com/photo-1", "city": "Mumbai",
+               "categories": ["Food"], "gender": "Female", "languages": ["Hindi"], "rate_per_video": 1500}
+        conflict = requests.put(f"{API}/creators/me", json=creator, headers=H(tok["brand"]))
+        assert conflict.status_code == 409
 
     def test_creator_profile_pending(self, tok):
         body = {"name": "TEST_Creator Tester", "photo": "https://images.unsplash.com/photo-1", "city": "Mumbai",
@@ -90,6 +94,10 @@ class TestProfiles:
         assert r.status_code == 200 and r.json()["status"] == "pending"
         assert requests.get(f"{API}/creators/{CREATOR}").status_code == 404
         assert requests.get(f"{API}/me", headers=H(tok["creator"])).json()["user"]["active_mode"] == "creator"
+        business = {"company": "TEST_Creator Business", "industry": "Restaurant", "city": "Mumbai",
+                "need_plans": ["per_video"], "budget": "5k-20k"}
+        conflict = requests.put(f"{API}/businesses/me", json=business, headers=H(tok["creator"]))
+        assert conflict.status_code == 409
 
     def test_invalid_creator_payload_422(self, tok):
         r = requests.put(f"{API}/creators/me", json={"name": "x"}, headers=H(tok["creator"]))
@@ -114,9 +122,9 @@ class TestProfiles:
         assert requests.patch(f"{API}/me", json={"active_mode": "business"}, headers=H(tok["creator"])).status_code == 400
 
 
-# --- offers + free limit + pro
+# --- offers without subscription limits
 class TestOffers:
-    def test_free_limit(self, tok):
+    def test_no_contact_limit(self, tok):
         mk = lambda cid: requests.post(f"{API}/deals", json={"creator_id": cid, "plan": "per_video", "brief": "TEST_ reel for cafe",
                                                              "start_date": "2026-12-01", "price": 2000}, headers=H(tok["brand"]))
         r1 = mk(CREATOR)
@@ -125,9 +133,9 @@ class TestOffers:
         r2 = mk("sample_1")
         assert r2.status_code == 200
         ST["sample_deal"] = r2.json()["id"]
-        assert mk("sample_2").status_code == 200  # iter4: free business may contact 3 creators
+        assert mk("sample_2").status_code == 200
         r4 = mk("sample_3")
-        assert r4.status_code == 402 and "Free accounts" in r4.json()["detail"]
+        assert r4.status_code == 200
 
     def test_brief_validation(self, tok):
         r = requests.post(f"{API}/deals", json={"creator_id": "sample_1", "plan": "per_video", "brief": "short",
@@ -142,14 +150,9 @@ class TestOffers:
         d = requests.get(f"{API}/deals/{ST['deal']}", headers=H(tok["brand"])).json()
         assert d["chat_open"] is True and d["free_chat"] is True
 
-    def test_upgrade_pro(self, tok):
+    def test_subscription_unavailable(self, tok):
         o = requests.post(f"{API}/payments/order", json={"kind": "pro"}, headers=H(tok["brand"]))
-        assert o.status_code == 200 and o.json()["mode"] == "test" and o.json()["amount"] == 99900
-        # another user can't verify brand's payment
-        assert requests.post(f"{API}/payments/verify", json={"payment_id": o.json()["payment_id"]}, headers=H(tok["creator"])).status_code == 404
-        v = requests.post(f"{API}/payments/verify", json={"payment_id": o.json()["payment_id"]}, headers=H(tok["brand"]))
-        assert v.status_code == 200
-        assert requests.get(f"{API}/me", headers=H(tok["brand"])).json()["is_pro"] is True
+        assert o.status_code == 400 and o.json()["detail"] == "Subscriptions are not available"
 
 
 # --- deal lifecycle with masking
@@ -161,45 +164,32 @@ class TestDealFlow:
         assert "a@b.com" not in msgs[-1]["text"]
 
     def test_counter_and_accept(self, tok):
-        assert requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "counter"}, headers=H(tok["creator"])).status_code == 400
-        # brand cannot accept its own offer
-        assert requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "accept"}, headers=H(tok["brand"])).status_code == 400
-        r = requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "counter", "price": 2600}, headers=H(tok["creator"]))
-        assert r.status_code == 200 and r.json()["status"] == "countered" and r.json()["counter_price"] == 2600
-        r = requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "accept_counter"}, headers=H(tok["brand"]))
-        assert r.status_code == 200 and r.json()["status"] == "accepted" and r.json()["price"] == 2600
+        for action, who in (("counter", "creator"), ("accept", "brand"), ("counter", "creator"), ("accept_counter", "brand")):
+            r = requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": action, "price": 2600}, headers=H(tok[who]))
+            assert r.status_code == 409 and "temporarily disabled" in r.json()["detail"]
 
     def test_pay_deal(self, tok):
-        assert requests.post(f"{API}/payments/order", json={"kind": "deal", "deal_id": ST["deal"]}, headers=H(tok["creator"])).status_code == 400
+        assert requests.post(f"{API}/payments/order", json={"kind": "deal", "deal_id": ST["deal"]}, headers=H(tok["creator"])).status_code == 409
         o = requests.post(f"{API}/payments/order", json={"kind": "deal", "deal_id": ST["deal"]}, headers=H(tok["brand"]))
-        assert o.status_code == 200 and o.json()["amount"] == 260000
-        assert requests.post(f"{API}/payments/verify", json={"payment_id": o.json()["payment_id"]}, headers=H(tok["brand"])).status_code == 200
+        assert o.status_code == 409 and "temporarily disabled" in o.json()["detail"]
         d = requests.get(f"{API}/deals/{ST['deal']}", headers=H(tok["creator"])).json()
-        assert d["status"] == "paid" and d["payout_status"] == "held"
+        assert d["status"] == "pending"
 
     def test_unmasked_after_pay(self, tok):
         msgs = requests.get(f"{API}/deals/{ST['deal']}/messages", headers=H(tok["creator"])).json()
-        assert "a@b.com" in msgs[-1]["text"] and "98765 43210" in msgs[-1]["text"]
+        assert "[hidden until payment]" in msgs[-1]["text"]
 
     def test_deliver_release_rate(self, tok):
-        assert requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "mark_delivered"}, headers=H(tok["brand"])).status_code == 400
-        r = requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "submit_work", "link": "https://instagram.com/p/test"}, headers=H(tok["creator"]))
-        assert r.status_code == 200 and r.json()["delivery_link"]
-        r = requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "mark_delivered"}, headers=H(tok["brand"]))
-        # iter3: payout is auto-released on mark_delivered (creator saved a payout UPI earlier)
-        assert r.status_code == 200 and r.json()["status"] == "completed" and r.json()["payout_amount"] == 2340
+        for action, who, extra in (("mark_delivered", "brand", {}), ("submit_work", "creator", {"link": "https://instagram.com/p/test"}), ("dispute", "brand", {"note": "TEST"})):
+            r = requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": action, **extra}, headers=H(tok[who]))
+            assert r.status_code == 409
+        assert requests.post(f"{API}/deals/{ST['deal']}/rate", json={"stars": 5}, headers=H(tok["brand"])).status_code == 409
         d = requests.get(f"{API}/deals/{ST['deal']}", headers=H(tok["brand"])).json()
-        assert d["status"] == "completed" and d["payout_status"] == "released"
-        r = requests.post(f"{API}/deals/{ST['deal']}/rate", json={"stars": 5, "review": "TEST_ great"}, headers=H(tok["brand"]))
-        assert r.status_code == 200
-        assert requests.post(f"{API}/deals/{ST['deal']}/rate", json={"stars": 4}, headers=H(tok["brand"])).status_code == 400
-        c = requests.get(f"{API}/creators/{CREATOR}").json()
-        assert c["rating_avg"] == 5 and c["rating_count"] == 1 and c["deals_done"] == 1
-        assert c["reviews"][0]["rating"]["stars"] == 5
+        assert d["status"] == "pending"
 
     def test_admin_stats(self, tok):
         s = requests.get(f"{API}/admin/stats", headers=H(tok["admin"])).json()
-        assert s["paid_by_businesses"] >= 2600 and s["platform_earnings"] >= 999 + 260
+        assert s["paid_by_businesses"] >= 0 and s["platform_earnings"] >= 0
 
 
 # --- notifications
@@ -207,7 +197,7 @@ class TestNotifications:
     def test_list_and_read(self, tok):
         n = requests.get(f"{API}/notifications", headers=H(tok["creator"])).json()
         kinds = {x["kind"] for x in n}
-        assert {"offer", "approval", "payment", "payout", "rating"} <= kinds
+        assert {"offer", "approval"} <= kinds
         assert requests.get(f"{API}/me", headers=H(tok["creator"])).json()["unread_notifications"] > 0
         assert requests.post(f"{API}/notifications/read", headers=H(tok["creator"])).status_code == 200
         assert requests.get(f"{API}/me", headers=H(tok["creator"])).json()["unread_notifications"] == 0

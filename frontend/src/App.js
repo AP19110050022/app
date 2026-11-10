@@ -16,7 +16,6 @@ import ChatList from "@/pages/ChatList";
 import DealRoom from "@/pages/DealRoom";
 import Notifications from "@/pages/Notifications";
 import Saved from "@/pages/Saved";
-import Upgrade from "@/pages/Upgrade";
 import Profile from "@/pages/Profile";
 import AdminShell from "@/pages/admin/AdminShell";
 import Pricing from "@/pages/admin/Pricing";
@@ -69,7 +68,7 @@ function App() {
             <Route path="chat/:id" element={<DealRoom />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="saved" element={<Saved />} />
-            <Route path="upgrade" element={<Upgrade />} />
+            <Route path="upgrade" element={<Navigate to="/app/profile" replace />} />
             <Route path="profile" element={<Profile />} />
             <Route path="admin" element={<Navigate to="/admin" replace />} />
             <Route path="settings" element={<SettingsPage />} />

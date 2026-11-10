@@ -21,9 +21,9 @@ export default function Posts() {
       <div className="mb-4 flex items-center gap-3">
         <button onClick={() => navigate(-1)} className="grid h-11 w-11 place-items-center rounded-full bg-white/15" aria-label="Back" data-testid="posts-back"><ArrowLeft className="h-5 w-5" /></button>
         <h1 className="flex-1 text-[22px] font-extrabold">Your posts</h1>
-        <span className="text-sm text-white/70">{posts.length} / 12</span>
+        <span className="text-sm text-white/70">{posts.length} / 3</span>
       </div>
-      <p className="mb-4 text-[13px] text-white/75">Photos and reels of your work. Businesses see them on your profile, like an Instagram grid.</p>
+      <p className="mb-4 text-[13px] text-white/75">Add up to 3 photos or reels of your work. Your profile photo is separate.</p>
       <PostsEditor value={posts} onChange={setPosts} />
       <button onClick={save} disabled={busy} className="cta mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-full font-extrabold" data-testid="posts-save-button">{busy && <Loader2 className="h-4 w-4 animate-spin" />}Save posts</button>
     </div>

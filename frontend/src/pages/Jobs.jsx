@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Loader2, Briefcase, Pencil, Trash2, Pause, Play, Send, X, Star } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,7 +25,7 @@ const JobForm = ({ open, onOpenChange, job, onSaved }) => {
   const save = async (e) => {
     e.preventDefault();
     const body = { title: f.title, description: f.description, plans: f.plans, budget: f.budget, languages: f.languages, status: f.status };
-    try { await (job ? api.put(`/jobs/${job.id}`, body) : api.post("/jobs", body)); toast.success(job ? "Job updated" : "Job posted. Creators can now see it."); onOpenChange(false); onSaved(); } catch (err) { toast.error(errMsg(err)); }
+    try { await (job ? api.put(`/jobs/${job.id}`, body) : api.post("/jobs", body)); toast.success(job ? "Job updated" : "Job posted. Presenters can now see it."); onOpenChange(false); onSaved(); } catch (err) { toast.error(errMsg(err)); }
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,11 +57,17 @@ const Interest = ({ i, onStatus, onOffer }) => (
   </div>
 );
 
-const BusinessJobs = () => {
+const BusinessJobs = ({ openCreate, onCreateHandled }) => {
   const { api } = useMe();
   const [jobs, setJobs] = useState(null);
   const [form, setForm] = useState({ open: false, job: null });
   const [offer, setOffer] = useState(null);
+  useEffect(() => {
+    if (openCreate) {
+      setForm({ open: true, job: null });
+      onCreateHandled();
+    }
+  }, [openCreate, onCreateHandled]);
   const load = useCallback(() => api.get("/jobs/mine").then((r) => setJobs(r.data)), [api]);
   useEffect(() => { load(); }, [load]);
   const safe = async (fn, ok) => { try { await fn(); if (ok) toast.success(ok); load(); } catch (e) { toast.error(errMsg(e)); } };
@@ -69,13 +75,13 @@ const BusinessJobs = () => {
   const del = (j) => safe(() => api.delete(`/jobs/${j.id}`), "Job deleted");
   const istat = (i, status) => safe(() => api.patch(`/interests/${i.id}`, { status }));
   const openOffer = async (i) => {
-    try { const { data } = await api.get(`/creators/${i.creator_id}`); setOffer({ c: data, i }); } catch { toast.error("This creator isn't available right now"); }
+    try { const { data } = await api.get(`/creators/${i.creator_id}`); setOffer({ c: data, i }); } catch { toast.error("This presenter isn't available right now"); }
   };
   return (
     <>
       <button onClick={() => setForm({ open: true, job: null })} className="cta mb-4 flex h-[52px] w-full items-center justify-center gap-2 rounded-full font-extrabold" data-testid="post-job-button"><Plus className="h-5 w-5" />Post a job</button>
       {jobs === null ? <div className="grid place-items-center py-16"><Loader2 className="h-7 w-7 animate-spin" /></div>
-        : !jobs.length ? <Empty icon={Briefcase} title="No jobs posted" text="Post a job so creators near you can find it and show interest. Your business appears in Discover only when you have an open job." testid="jobs-mine-empty" />
+        : !jobs.length ? <Empty icon={Briefcase} title="No jobs posted" text="Post a job so presenters near you can find it and show interest. Your business appears in Discover only when you have an open job." testid="jobs-mine-empty" />
         : <div className="space-y-3">{jobs.map((j) => (
           <div key={j.id} className="glass rounded-[24px] p-4" data-testid={`my-job-${j.id}`}>
             <div className="flex items-start justify-between gap-2"><p className="text-lg font-extrabold leading-tight">{j.title}</p><Pill s={j.status} /></div>
@@ -111,13 +117,20 @@ const CreatorInterests = () => {
 
 export default function Jobs() {
   const { me } = useMe();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openCreate = searchParams.get("create") === "1";
+  const clearCreate = useCallback(() => setSearchParams((current) => {
+    const next = new URLSearchParams(current);
+    next.delete("create");
+    return next;
+  }, { replace: true }), [setSearchParams]);
   const both = me.creator && me.business;
   const [side, setSide] = useState(me.user.active_mode === "creator" || !me.business ? "creator" : "business");
   return (
     <div className="mx-auto max-w-2xl" data-testid="jobs-page">
-      <SubHeader title={side === "business" ? "My jobs" : "Jobs I'm interested in"} sub={side === "business" ? "Post work so creators can find you." : "Businesses can send you an offer."} />
+      <SubHeader title={side === "business" ? "My jobs" : "Jobs I'm interested in"} sub={side === "business" ? "Post work so presenters can find you." : "Businesses can send you an offer."} />
       {both && <div className="mb-4"><Seg value={side} onChange={setSide} options={[["business", "My jobs"], ["creator", "My interest"]]} testid="jobs-side" /></div>}
-      {side === "business" ? (me.business ? <BusinessJobs /> : null) : me.creator ? <CreatorInterests /> : <Empty icon={Briefcase} title="Create a creator profile first" testid="jobs-no-creator" action={<Link to="/app/setup/creator" className="mt-4 rounded-full bg-white px-5 py-2.5 text-sm font-extrabold text-[#3B25A8]">Set up</Link>} />}
+      {side === "business" ? (me.business ? <BusinessJobs openCreate={openCreate} onCreateHandled={clearCreate} /> : null) : me.creator ? <CreatorInterests /> : <Empty icon={Briefcase} title="Create a presenter profile first" testid="jobs-no-creator" action={<Link to="/app/setup/creator" className="mt-4 rounded-full bg-white px-5 py-2.5 text-sm font-extrabold text-[#3B25A8]">Set up</Link>} />}
     </div>
   );
 }

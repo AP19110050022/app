@@ -55,13 +55,13 @@ def test_chat_thread_and_offer_conversion():
     d = call("GET", f"/deals/{cid}", "brand").json()
     assert d["status"] == "chat" and d["free_chat"] is True and d["chat_open"] is True and d["is_business"] is True
     m = call("POST", f"/deals/{cid}/messages", "brand", json={"text": "TEST hello from brand"})
-    assert m.status_code == 200, m.text
+    assert m.status_code == 200 and m.json()["seen"] is False, m.text
     assert call("POST", f"/deals/{cid}/messages", "creator", json={"text": "TEST hi back"}).status_code == 200
     assert call("POST", f"/deals/{cid}/messages", "admin", json={"text": "TEST admin"}).status_code == 403
     me = call("GET", "/me", "brand").json()
     assert me["contacts_used"] == 1 and me["free_contacts"] == 3
     # actions on a chat thread are rejected
-    assert call("POST", f"/deals/{cid}/action", "creator", json={"action": "accept"}).status_code == 400
+    assert call("POST", f"/deals/{cid}/action", "creator", json={"action": "accept"}).status_code == 409
     # offer converts the same thread
     o = call("POST", "/deals", "brand", json={"creator_id": CREATOR, "plan": "per_video", "brief": "TEST brief for video",
                                               "start_date": "2026-02-10", "price": 1500})
@@ -69,13 +69,16 @@ def test_chat_thread_and_offer_conversion():
     assert o.json()["id"] == cid and o.json()["status"] == "pending"
     msgs = call("GET", f"/deals/{cid}/messages", "creator").json()
     assert [x["text"] for x in msgs] == ["TEST hello from brand", "TEST hi back"]
+    assert [x["seen"] for x in msgs] == [True, False]
+    msgs = call("GET", f"/deals/{cid}/messages", "brand").json()
+    assert [x["seen"] for x in msgs] == [True, True]
     assert call("GET", "/me", "brand").json()["contacts_used"] == 1
     # message on existing active deal returns that deal
     assert call("POST", "/chats", "brand", json={"creator_id": CREATOR}).json()["id"] == cid
     t.S["cid"] = cid
 
 
-def test_free_contact_limit():
+def test_unlimited_contacts_and_chat():
     ids = []
     for uid in FAKE[:2]:
         r = call("POST", "/chats", "brand", json={"creator_id": uid})
@@ -83,26 +86,17 @@ def test_free_contact_limit():
         ids.append(r.json()["id"])
     assert call("GET", "/me", "brand").json()["contacts_used"] == 3
     r = call("POST", "/chats", "brand", json={"creator_id": FAKE[2]})
-    assert r.status_code == 402, r.text
+    assert r.status_code == 200, r.text
+    ids.append(r.json()["id"])
     offer = {"creator_id": FAKE[2], "plan": "per_video", "brief": "TEST brief for video", "start_date": "2026-02-10", "price": 1500}
-    assert call("POST", "/deals", "brand", json=offer).status_code == 402
+    assert call("POST", "/deals", "brand", json=offer).status_code == 200
     # existing contacts still allowed
     assert call("POST", "/chats", "brand", json={"creator_id": FAKE[0]}).status_code == 200
     assert call("POST", "/deals", "brand", json={**offer, "creator_id": FAKE[1]}).status_code == 200
     assert call("POST", f"/deals/{ids[0]}/messages", "brand", json={"text": "TEST still ok"}).status_code == 200
-    # Pro = unlimited
-    mdb.users.update_one({"user_id": BRAND}, {"$set": {"pro_until": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat()}})
-    try:
-        r = call("POST", "/chats", "brand", json={"creator_id": FAKE[2]})
-        assert r.status_code == 200, r.text
-        d = call("GET", f"/deals/{r.json()['id']}", "brand").json()
-        assert d["free_chat"] is False and d["chat_open"] is True
-        assert call("POST", "/deals", "brand", json={**offer, "creator_id": FAKE[3]}).status_code == 200
-    finally:
-        mdb.users.update_one({"user_id": BRAND}, {"$set": {"pro_until": None}})
-    # After Pro lapses: pro-created thread closes, free threads stay open
-    d = call("GET", f"/deals/{r.json()['id']}", "brand").json()
-    print("pro-created thread after lapse chat_open:", d["chat_open"])
+    assert call("POST", "/deals", "brand", json={**offer, "creator_id": FAKE[3]}).status_code == 200
+    d = call("GET", f"/deals/{ids[-1]}", "brand").json()
+    assert d["chat_open"] is True
     assert call("GET", f"/deals/{ids[0]}", "brand").json()["chat_open"] is True
 
 
@@ -132,7 +126,7 @@ def test_pricing_admin():
     assert call("GET", "/admin/pricing").status_code == 401
     assert call("GET", "/admin/pricing", "brand").status_code == 403
     g = call("GET", "/admin/pricing", "admin")
-    assert g.status_code == 200 and g.json() == {"pro_price": 999, "pro_days": 30, "fee_pct": 10, "free_contacts": 3}
+    assert g.status_code == 200 and g.json() == {"pro_price": 999, "pro_days": 30, "fee_pct": 10, "free_contacts": 3, "deal_workflow_enabled": False}
     body = {"pro_price": 1499, "pro_days": 60, "fee_pct": 12, "free_contacts": 2}
     assert call("PUT", "/admin/pricing", "admin", json=body).status_code == 403  # helper
     mdb.users.update_one({"user_id": ADMIN}, {"$set": {"role": "owner"}})

@@ -3,7 +3,7 @@ import { NavLink, Outlet, Link, Navigate, useLocation } from "react-router-dom";
 import { LayoutDashboard, BadgeCheck, Flag, Users, Images, Handshake, UserCog, History, ArrowLeft, Loader2, Tag } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useMe } from "@/context/MeContext";
-import { BlockedScreen } from "@/components/layout/AppShell";
+import { BlockedScreen, SignInFailed } from "@/components/layout/AppShell";
 
 const NAV = [
   ["", "Dashboard", LayoutDashboard], ["approvals", "Approvals", BadgeCheck], ["reports", "Reports", Flag], ["users", "Users", Users],
@@ -24,7 +24,7 @@ export default function AdminShell() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   if (blocked) return <BlockedScreen />;
-  if (!me) return <div className="grid min-h-screen place-items-center text-white">{error ? "Couldn't load your account." : <Loader2 className="h-8 w-8 animate-spin" />}</div>;
+  if (!me) return <div className="grid min-h-screen place-items-center text-white">{error ? <SignInFailed /> : <Loader2 className="h-8 w-8 animate-spin" />}</div>;
   const role = me.user.role;
   if (!["owner", "admin"].includes(role)) return <Navigate to="/app" replace />;
   const nav = NAV.filter((n) => !n[3] || role === "owner");

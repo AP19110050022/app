@@ -7,7 +7,7 @@ export const Stepper = ({ steps, current }) => (
 );
 
 export const Field = ({ label, hint, children }) => (
-  <div className="space-y-2">
+  <div className="min-w-0 space-y-2">
     <p className="text-[13px] font-bold text-white/85">{label}</p>
     {children}
     {hint && <p className="text-xs text-white/60">{hint}</p>}

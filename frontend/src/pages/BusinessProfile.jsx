@@ -24,9 +24,9 @@ export default function BusinessProfile() {
   if (missing) return <p className="py-20 text-center font-bold" data-testid="business-not-found">Business not found</p>;
   if (!b) return <div className="grid place-items-center py-20"><Loader2 className="h-7 w-7 animate-spin" /></div>;
   const own = id === me.user.user_id;
-  const toggleSave = async () => { await (saved ? api.delete(`/saved/${id}`) : api.post(`/saved/${id}`, null, { params: { kind: "business" } })); setSaved(!saved); toast.success(saved ? "Removed from saved" : "Saved"); };
+  const toggleSave = async () => { await (saved ? api.delete(`/saved/${id}`) : api.post(`/saved/${id}`, null, { params: { kind: "business" } })); setSaved(!saved); };
   const interest = async (j) => {
-    if (!me.creator) return toast.error("Set up your creator profile first. Tap + to start.");
+    if (!me.creator) return toast.error("Set up your presenter profile first. Tap + to start.");
     try { await api.post(`/jobs/${j.id}/interest`, { note: "" }); setApplied((a) => [...a, j.id]); toast.success("Interest sent"); } catch (e) { toast.error(errMsg(e)); }
   };
   return (

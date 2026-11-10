@@ -1,5 +1,5 @@
 {
-  "project_name": "HireMyFace",
+  "project_name": "HireAvatar",
   "app_type": "hybrid_fullstack_marketplace",
   "theme_strategy": {
     "primary_theme": "Electric Violet & Deep Indigo Light Theme with Rich Dark Mode accents",
@@ -74,7 +74,7 @@
       "sections": [
         "Navigation Header with Logo, How It Works, Plans, Creators, Sign In CTA",
         "Hero Section with bold dynamic headline, instant search bar, badge '1,200+ Verified Presenters', and high impact creator media grid",
-        "How HireMyFace Works (3 simple steps: 1. Browse Creators, 2. Send Offer & Escrow, 3. Receive Promo Video)",
+        "How HireAvatar Works (3 simple steps: 1. Browse Presenters, 2. Send Offer, 3. Discuss details in chat)",
         "Simplified Pricing Plans (Per Video starts from ₹499, Part-Time starting ₹8,000/mo, Full-Time starting ₹25,000/mo)",
         "Business Pro Membership (₹999/mo with 0% commission & direct contacts)",
         "Featured Creator Carousel/Grid with live video demo teasers & category filters",

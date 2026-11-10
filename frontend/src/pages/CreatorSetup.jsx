@@ -15,7 +15,7 @@ import { useMe } from "@/context/MeContext";
 import { errMsg } from "@/lib/api";
 
 const BLANK = { name: "", photo: "", city: "", categories: [], gender: "", languages: [], bio: "", intro_video: "", samples: [], instagram: "", youtube: "", followers: 0, phone: "", rate_per_video: "", rate_part_time: "", rate_full_time: "" };
-const HINT = { per_video: "Most creators start between ₹500 and ₹3,000", part_time: "Usually 6–8× your per-video price", full_time: "Usually 15–20× your per-video price" };
+const HINT = { per_video: "Most presenters start between ₹500 and ₹3,000", part_time: "Usually 6–8× your per-video price", full_time: "Usually 15–20× your per-video price" };
 const TITLES = [["Tell brands who you are", "A clear face photo works best."], ["Show your work", "Links to your intro video, reels and socials. All optional."], ["Set your prices", "Brands see “from ₹…” on your card. 10% service fee on paid deals."]];
 
 export default function CreatorSetup() {
@@ -55,7 +55,7 @@ export default function CreatorSetup() {
   return (
     <SetupFrame testid="creator-setup-page" step={step} total={3} title={TITLES[step][0]} sub={TITLES[step][1]}
       onBack={() => (step ? setStep(step - 1) : navigate(-1))} disabled={!valid[step]} busy={busy}
-      cta={step < 2 ? "Continue" : editing ? "Save changes" : "Create creator profile"} onNext={() => (step < 2 ? setStep(step + 1) : save())}>
+      cta={step < 2 ? "Continue" : editing ? "Save changes" : "Create presenter profile"} onNext={() => (step < 2 ? setStep(step + 1) : save())}>
       {step === 0 && (
         <>
           <ImagePicker value={f.photo} onChange={set("photo")} testid="creator-photo" label="Profile photo (required)" />
@@ -72,10 +72,10 @@ export default function CreatorSetup() {
         <>
           <Field label="Short bio"><Textarea rows={3} maxLength={500} value={f.bio} onChange={set("bio")} placeholder="What makes you a great face for brands?" data-testid="creator-bio-input" /></Field>
           <Field label="Intro video link" hint="30–60s of you on camera (YouTube, Instagram or Drive)"><Input value={f.intro_video} onChange={set("intro_video")} placeholder="https://…" data-testid="creator-intro-input" /></Field>
-          <Field label={`Photos & work samples (${f.samples.length}/12)`} hint="Upload photos or add links to your reels. They show as posts on your profile.">
+          <Field label={`Photos & work samples (${f.samples.length}/3)`} hint="Add up to 3 photos or reel links. Your profile photo is separate.">
             <PostsEditor value={f.samples} onChange={set("samples")} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Instagram"><Input value={f.instagram} onChange={set("instagram")} placeholder="@yourname" data-testid="creator-instagram-input" /></Field>
             <Field label="YouTube"><Input value={f.youtube} onChange={set("youtube")} placeholder="@channel" data-testid="creator-youtube-input" /></Field>
             <Field label="Total followers"><Input type="number" min={0} value={f.followers} onChange={set("followers")} data-testid="creator-followers-input" /></Field>

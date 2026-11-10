@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Send, Loader2, Info } from "lucide-react";
+import { Send, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,7 +15,7 @@ const Box = ({ children, testid }) => (
 );
 
 export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_video", onSent }) => {
-  const { me, api, config, refresh } = useMe();
+  const { me, api, refresh } = useMe();
   const navigate = useNavigate();
   const [plan, setPlan] = useState(initialPlan);
   const [price, setPrice] = useState(0);
@@ -33,9 +33,6 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
   }, [open, initialPlan, creator]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (p) => { setPlan(p.id); setPrice(creator[p.rate]); };
-  const limit = me?.free_contacts ?? config?.free_contacts ?? 3;
-  const left = Math.max(0, limit - (me?.contacts_used || 0));
-
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -56,10 +53,12 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
       <Dialog open={open} onOpenChange={onOpenChange}>
         <Box testid="offer-need-business-dialog">
           <DialogHeader className="text-left">
-            <DialogTitle className="text-2xl font-extrabold text-white">Set up your business first</DialogTitle>
-            <DialogDescription className="text-white/75">2 quick steps. Creators see your brand name with every offer.</DialogDescription>
+            <DialogTitle className="text-2xl font-extrabold text-white">{me?.creator ? "Only businesses can message or hire presenters" : "Set up your business first"}</DialogTitle>
+            {!me?.creator && <DialogDescription className="text-white/75">Presenters see your brand name with every offer.</DialogDescription>}
           </DialogHeader>
-          <button className="cta h-12 rounded-full font-extrabold" onClick={() => navigate(`/app/setup/business?next=/app/creator/${creator.user_id}`)} data-testid="offer-setup-business-button">Create business profile</button>
+          {me?.creator
+            ? <button className="cta h-12 rounded-full font-extrabold" onClick={() => onOpenChange(false)} data-testid="offer-only-business-close">Close</button>
+            : <button className="cta h-12 rounded-full font-extrabold" onClick={() => navigate(`/app/setup/business?next=/app/creator/${creator.user_id}`)} data-testid="offer-setup-business-button">Create business profile</button>}
         </Box>
       </Dialog>
     );
@@ -86,15 +85,10 @@ export const OfferDialog = ({ creator, open, onOpenChange, initialPlan = "per_vi
           <Field label="Brief">
             <Textarea required minLength={10} rows={4} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="e.g. 30-second Instagram reel showing our new cold coffee, shot in our café, Hindi + English." data-testid="offer-brief-input" />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Start date"><Input type="date" required value={date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} className="[color-scheme:dark]" data-testid="offer-date-input" /></Field>
             <Field label="Your price (₹)"><Input type="number" required min={100} value={price} onChange={(e) => setPrice(e.target.value)} data-testid="offer-price-input" /></Field>
           </div>
-          {!me.is_pro && (
-            <p className="flex items-start gap-2 rounded-2xl bg-white/10 p-3 text-xs text-white/85" data-testid="offer-free-limit-note">
-              <Info className="mt-0.5 h-4 w-4 shrink-0" /> Free plan: you can contact {limit} creators ({left} left). Chatting with them is free; paying in the app needs Business Pro.{left === 0 && <> Already used up? <button type="button" onClick={() => navigate("/app/upgrade")} className="font-extrabold underline" data-testid="offer-upgrade-link">Upgrade</button> to contact new creators.</>}
-            </p>
-          )}
           <button type="submit" disabled={busy} className="cta flex h-[52px] w-full items-center justify-center gap-2 rounded-full font-extrabold disabled:opacity-60" data-testid="offer-submit-button">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send offer · {inr(price)}
           </button>

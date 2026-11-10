@@ -1,5 +1,5 @@
 # Iteration 2 features: multi-category + plan toggles, sort, visibility, posts, notify prefs, business need_plans, jobs & interests
-# Requires test_hiremyface_api.py to have run first (approved TEST creator, TEST business with Pro). Run serially: -n 0
+# Requires the base API regression suite to have run first (approved TEST creator and business). Run serially: -n 0
 import os
 import sys
 from pathlib import Path
@@ -106,7 +106,7 @@ class TestVisibilityPosts:
         posts = ["https://images.unsplash.com/photo-TEST1", "https://instagram.com/reel/TEST"]
         assert requests.put(f"{API}/creators/me/posts", json={"posts": posts}, headers=H(tok["creator"])).status_code == 200
         assert requests.get(f"{API}/creators/{CREATOR}").json()["samples"] == posts
-        r = requests.put(f"{API}/creators/me/posts", json={"posts": ["x"] * 13}, headers=H(tok["creator"]))
+        r = requests.put(f"{API}/creators/me/posts", json={"posts": ["x"] * 4}, headers=H(tok["creator"]))
         assert r.status_code == 422
 
 
@@ -123,7 +123,7 @@ class TestNotifyPrefs:
         assert requests.post(f"{API}/deals/{ST['deal']}/messages", json={"text": "hello"}, headers=H(tok["brand"])).status_code == 200
         assert db.notifications.count_documents({"user_id": CREATOR, "kind": "message"}) == before
         assert db.notifications.count_documents({"user_id": CREATOR, "kind": "offer", "link": f"/app/chat/{ST['deal']}"}) == 1
-        requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "cancel"}, headers=H(tok["brand"]))
+        assert requests.post(f"{API}/deals/{ST['deal']}/action", json={"action": "cancel"}, headers=H(tok["brand"])).status_code == 409
 
 
 # --- business need_plans

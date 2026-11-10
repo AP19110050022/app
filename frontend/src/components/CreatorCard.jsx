@@ -29,7 +29,7 @@ export const CreatorCard = ({ c, saved, onToggleSave, to, index = 0 }) => (
       </div>
     </Link>
     {onToggleSave && (
-      <button onClick={() => onToggleSave(c.user_id)} data-testid={`save-creator-${c.user_id}`} aria-label="Save creator"
+      <button onClick={() => onToggleSave(c.user_id)} data-testid={`save-creator-${c.user_id}`} aria-label="Save presenter"
         className="absolute right-1 top-1 grid h-11 w-11 place-items-center transition-transform duration-200 active:scale-90">
         <span className="grid h-8 w-8 place-items-center rounded-full bg-white/95 text-[#6C4CF1]">
           <Bookmark className={`h-4 w-4 ${saved ? "fill-[#6C4CF1]" : ""}`} />

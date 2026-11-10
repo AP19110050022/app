@@ -27,7 +27,7 @@ export default function Team() {
         <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="helper@email.com" className="rounded-full" data-testid="team-email-input" />
         <button type="submit" className="cta inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-extrabold" data-testid="team-add-button"><UserPlus className="h-4 w-4" />Add helper</button>
       </form>
-      <p className="-mt-3 mb-5 px-1 text-xs text-white/60">If they don't have a HireMyFace account yet, they become admin as soon as they sign up with this email.</p>
+      <p className="-mt-3 mb-5 px-1 text-xs text-white/60">If they don't have a HireAvatar account yet, they become admin as soon as they sign up with this email.</p>
       {!d?.admins ? <Spinner /> : (<>
         <Box testid="team-list">
           {d.admins.map((a) => (

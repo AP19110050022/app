@@ -11,6 +11,10 @@ const appearance = {
     fontFamily: "'Plus Jakarta Sans', sans-serif",
     borderRadius: "0.75rem",
   },
+  elements: {
+    formFieldInput: "border-2 border-slate-500 shadow-sm focus:border-violet-600 focus:ring-2 focus:ring-violet-300",
+    socialButtonsBlockButton: "border-2 border-slate-500 shadow-sm hover:border-violet-600",
+  },
 };
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -36,19 +40,31 @@ export default function ClerkAuthProvider({ children }) {
     return () => { cancelled = true; };
   }, []);
 
-  if (unavailable) return <p style={{ padding: 24 }}>Sign-in is unavailable right now. Refresh the page to try again.</p>;
+  if (unavailable) return (
+    <div className="grid min-h-screen place-items-center px-6 text-center text-white" data-testid="signin-unavailable">
+      <div className="glass max-w-sm rounded-[28px] p-8">
+        <p className="text-xl font-extrabold">Sign-in is unavailable right now</p>
+        <p className="mt-1 text-sm text-white/75">We couldn't reach the sign-in service.</p>
+        <button onClick={() => window.location.reload()} className="mt-5 h-11 rounded-full bg-white px-6 text-sm font-extrabold text-[#3B25A8]" data-testid="signin-unavailable-retry">Try again</button>
+      </div>
+    </div>
+  );
   if (!config) return null;
   return (
     <ClerkProvider
       publishableKey={config.publishable_key}
       proxyUrl={config.proxy_url || undefined}
       appearance={appearance}
+      localization={{
+        signIn: { start: { title: "Continue to HireAvatar", titleCombined: "Continue to HireAvatar" } },
+        signUp: { start: { title: "Create your HireAvatar account", titleCombined: "Create your HireAvatar account" } },
+      }}
       routerPush={(to) => navigate(to)}
       routerReplace={(to) => navigate(to, { replace: true })}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
-      signInFallbackRedirectUrl="/"
-      signUpFallbackRedirectUrl="/"
+      signInFallbackRedirectUrl="/app"
+      signUpFallbackRedirectUrl="/app"
       afterSignOutUrl="/"
     >
       {children}

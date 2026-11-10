@@ -46,7 +46,7 @@ export default function BusinessSetup() {
 
   return (
     <SetupFrame testid="business-setup-page" step={step} total={2}
-      title={step === 0 ? "Set up your business" : "What do you need?"} sub={step === 0 ? "Creators see this with every offer you send." : "We'll use this to show the right creators first."}
+      title={step === 0 ? "Set up your business" : "What do you need?"} sub={step === 0 ? "Presenters see this with every offer you send." : "We'll use this to show the right presenters first."}
       onBack={() => (step ? setStep(0) : navigate(-1))} disabled={!valid[step]} busy={busy}
       cta={step === 0 ? "Continue" : editing ? "Save changes" : "Create business profile"} onNext={() => (step === 0 ? setStep(1) : save())}>
       {step === 0 ? (
@@ -57,7 +57,7 @@ export default function BusinessSetup() {
           <Field label="City or town">
             <LocationField value={f} onChange={(l) => setF((p) => ({ ...p, city: l.city, state: l.state, lat: l.lat, lng: l.lng }))} testid="business-city-input" />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Website / Instagram"><Input value={f.website} onChange={set("website")} placeholder="@brand" data-testid="business-website-input" /></Field>
             <Field label="Phone (private)"><Input value={f.phone} onChange={set("phone")} placeholder="+91…" data-testid="business-phone-input" /></Field>
           </div>

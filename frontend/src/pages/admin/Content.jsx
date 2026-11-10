@@ -22,7 +22,7 @@ const Jobs = ({ onRemove, jobs }) => (
   </Box>
 );
 
-const Posts = ({ posts, onRemove }) => posts.length === 0 ? <div className="glass rounded-[22px]"><Nothing t="No creator posts yet" /></div> : (
+const Posts = ({ posts, onRemove }) => posts.length === 0 ? <div className="glass rounded-[22px]"><Nothing t="No presenter posts yet" /></div> : (
   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" data-testid="admin-posts-grid">
     {posts.map((p) => (
       <div key={`${p.creator_id}-${p.index}`} className="glass overflow-hidden rounded-[20px]" data-testid={`admin-post-${p.creator_id}-${p.index}`}>

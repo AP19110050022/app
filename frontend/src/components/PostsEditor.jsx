@@ -5,7 +5,7 @@ import { resizeImage } from "@/components/ImagePicker";
 
 const isImg = (u) => u.startsWith("data:image") || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u) || u.includes("images.unsplash.com");
 
-export const PostsEditor = ({ value, onChange, max = 12 }) => {
+export const PostsEditor = ({ value, onChange, max = 3 }) => {
   const ref = useRef(null);
   const [link, setLink] = useState("");
   const full = value.length >= max;

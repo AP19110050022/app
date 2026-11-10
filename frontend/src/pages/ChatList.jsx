@@ -15,9 +15,9 @@ export default function ChatList() {
 
   return (
     <div className="mx-auto max-w-2xl" data-testid="chat-list-page">
-      <SubHeader title="Chat" sub="Message creators and businesses. Contacts stay hidden until a deal is paid." />
+      <SubHeader title="Chat" sub="Message presenters and businesses. Contacts stay hidden until a deal is paid." />
       {deals === null ? <div className="grid place-items-center py-16"><Loader2 className="h-7 w-7 animate-spin" /></div>
-        : deals.length === 0 ? <Empty icon={MessageCircle} title="No conversations yet" text="Tap Message on a creator's profile to start a chat." testid="chat-empty" />
+        : deals.length === 0 ? <Empty icon={MessageCircle} title="No conversations yet" text="Tap Message on a presenter's profile to start a chat." testid="chat-empty" />
         : (
           <div className="space-y-1">
             {deals.map((d) => {

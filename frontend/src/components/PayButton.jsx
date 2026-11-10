@@ -38,7 +38,7 @@ export const PayButton = ({ body, label, onPaid, testid = "pay-button", classNam
       }
       if (!(await loadRazorpay())) throw new Error("Could not load Razorpay");
       new window.Razorpay({
-        key: o.key_id, amount: o.amount, currency: o.currency, name: "HireMyFace", description: o.description,
+        key: o.key_id, amount: o.amount, currency: o.currency, name: "HireAvatar", description: o.description,
         order_id: o.order_id, prefill: o.prefill, theme: { color: "#7C3AED" },
         handler: async (r) => {
           try {

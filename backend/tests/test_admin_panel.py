@@ -13,6 +13,7 @@ BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 mdb = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 ADMIN, BRAND, CREATOR = USERS["admin"], USERS["brand"], USERS["creator"]
 S = {}  # shared state across ordered tests
+WORKFLOW_ENABLED = requests.get(BASE + "/config", timeout=30).json().get("deal_workflow_enabled", True)
 
 
 def tok(who, fresh=False):
@@ -151,9 +152,8 @@ def test_creator_approvals():
 
 def test_business_setup_pro():
     assert call("PUT", "/businesses/me", "brand", json=BIZ_BODY).status_code == 200
-    o = call("POST", "/payments/order", "brand", json={"kind": "pro"}).json()
-    assert call("POST", "/payments/verify", "brand", json={"payment_id": o["payment_id"]}).status_code == 200
-    assert call("GET", "/me", "brand").json()["is_pro"] is True
+    o = call("POST", "/payments/order", "brand", json={"kind": "pro"})
+    assert o.status_code == 400 and o.json()["detail"] == "Subscriptions are not available"
     j = call("POST", "/jobs", "brand", json={"title": "TEST Admin job", "description": "TEST job description long", "plans": ["per_video"], "budget": "5k-20k"})
     assert j.status_code == 200
     S["job"] = j.json()["id"]
@@ -204,6 +204,7 @@ def test_resolve_reports():
 
 
 # ---------- deals & payouts ----------
+@pytest.mark.skipif(not WORKFLOW_ENABLED, reason="deal payments are temporarily disabled")
 def test_payout_failed_then_admin_retry():
     did = new_paid_deal(2000)
     assert call("POST", f"/deals/{did}/action", "brand", json={"action": "mark_delivered"}).status_code == 400  # no work yet
@@ -222,6 +223,7 @@ def test_payout_failed_then_admin_retry():
     assert call("POST", f"/admin/deals/{did}/retry-payout", "admin").status_code == 400
 
 
+@pytest.mark.skipif(not WORKFLOW_ENABLED, reason="deal payments are temporarily disabled")
 def test_payout_auto_release_on_upi_save():
     mdb.users.update_one({"user_id": CREATOR}, {"$set": {"payout_upi": ""}})
     did = new_paid_deal(3000)
@@ -232,6 +234,7 @@ def test_payout_auto_release_on_upi_save():
     assert g["status"] == "completed" and g["payout_status"] == "released"
 
 
+@pytest.mark.skipif(not WORKFLOW_ENABLED, reason="deal payments are temporarily disabled")
 def test_payout_released_directly_with_upi():
     did = new_paid_deal(1000)
     call("POST", f"/deals/{did}/action", "creator", json={"action": "submit_work", "link": "https://example.com/v3"})
@@ -239,6 +242,7 @@ def test_payout_released_directly_with_upi():
     assert r["status"] == "completed" and r["payout_status"] == "released"
 
 
+@pytest.mark.skipif(not WORKFLOW_ENABLED, reason="deal payments are temporarily disabled")
 def test_dispute_release_and_refund():
     d1 = new_paid_deal(2500)
     assert call("POST", f"/deals/{d1}/action", "brand", json={"action": "dispute"}).status_code == 400
@@ -290,7 +294,7 @@ def test_block_and_unblock_creator():
     assert call("GET", f"/creators/{CREATOR}").status_code == 404
     assert call("GET", f"/deals/{pend}", "brand").json()["paused"] is True
     assert call("POST", f"/deals/{pend}/messages", "brand", json={"text": "TEST hi"}).status_code == 400
-    assert call("POST", f"/deals/{pend}/action", "brand", json={"action": "cancel"}).status_code == 400
+    assert call("POST", f"/deals/{pend}/action", "brand", json={"action": "cancel"}).status_code == 409
     u = call("GET", f"/admin/users/{CREATOR}", "admin").json()
     assert u["user"]["blocked"] is True and u["user"]["block_reason"] == "TEST fake account"
     assert any(x["user_id"] == CREATOR for x in call("GET", "/admin/users?status=blocked", "admin").json())
@@ -358,6 +362,7 @@ def test_admin_message_not_attributed_to_creator():
     assert r.status_code in (403, 404) or r.json().get("sender_name") not in (d["creator_name"], d["business_name"]), r.text
 
 
+@pytest.mark.skipif(not WORKFLOW_ENABLED, reason="deal payments are temporarily disabled")
 def test_concurrent_mark_delivered_no_500():
     from concurrent.futures import ThreadPoolExecutor
     did = new_paid_deal(1400)

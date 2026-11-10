@@ -26,7 +26,7 @@ const Peek = () => {
 };
 
 const PLAN_PILLS = [
-  { icon: Video, t: "Per Video", d: "One finished video, from the creator's price" },
+  { icon: Video, t: "Per Video", d: "One finished video, from the presenter's price" },
   { icon: CalendarClock, t: "Part-time", d: "Up to 8 videos + 1 shoot day a month" },
   { icon: Crown, t: "Full-time", d: "Your dedicated face, up to 20 videos a month" },
 ];
@@ -42,15 +42,15 @@ export default function Landing() {
           <Link to="/sign-in" className="rounded-full bg-white/15 px-4 py-2 text-sm font-bold transition-colors hover:bg-white/25" data-testid="landing-login-button">Log in</Link>
         </div>
         <h1 className="rise mt-8 text-[34px] font-extrabold leading-[1.08] tracking-tight sm:text-5xl">Be the face of a brand.<br />Or find yours.</h1>
-        <p className="rise mt-3 text-[17px] text-white/80" style={{ animationDelay: "80ms" }}>Creators get hired to promote. Businesses find on-camera talent in minutes.</p>
+        <p className="rise mt-3 text-[17px] text-white/80" style={{ animationDelay: "80ms" }}>Presenters get hired to promote. Businesses find on-camera talent in minutes.</p>
         <div className="mt-7"><Peek /></div>
         <div className="mt-7 space-y-3">
           <Link to="/sign-up" data-testid="landing-signup-button" className="flex h-[54px] items-center justify-center rounded-[27px] bg-white text-base font-extrabold text-[#2E1C8C] shadow-lg transition-transform active:scale-[.98]">Create account</Link>
           <Link to="/sign-in" data-testid="landing-signin-button" className="glass flex h-[54px] items-center justify-center rounded-[27px] text-base font-bold transition-colors hover:bg-white/20">I already have an account</Link>
-          <p className="text-center text-xs text-white/60">Continue with Google or email. Choose creator or business after you sign in.</p>
+          <p className="text-center text-xs text-white/60">Continue with Google or email. Choose presenter or business after you sign in.</p>
         </div>
         <div className="mt-10 grid grid-cols-2 gap-3">
-          {[[Play, "Creators", "Join free, set your own prices, get paid to UPI.", "from-[#7C5CFF] to-[#FF5FA2]"], [Store, "Businesses", "Message creators free. Pro unlocks unlimited chats & payments.", "from-[#3B82F6] to-[#7C5CFF]"]].map(([Icon, t, d, tone]) => (
+          {[[Play, "Presenters", "Join free, set your own prices, and receive business offers.", "from-[#7C5CFF] to-[#FF5FA2]"], [Store, "Businesses", "Message presenters and send offers.", "from-[#3B82F6] to-[#7C5CFF]"]].map(([Icon, t, d, tone]) => (
             <div key={t} className="glass rounded-[22px] p-4" data-testid={`landing-side-${t.toLowerCase()}`}>
               <span className={`grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br ${tone}`}><Icon className="h-5 w-5" /></span>
               <p className="mt-3 font-extrabold">{t}</p>
@@ -68,8 +68,8 @@ export default function Landing() {
             </Link>
           ))}
         </div>
-        <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-white/60"><ShieldCheck className="h-4 w-4" />Payments are held until the business approves the work.</p>
-        <p className="mt-6 text-center text-xs text-white/40">© {new Date().getFullYear()} HireMyFace</p>
+        <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-white/60"><ShieldCheck className="h-4 w-4" />Businesses can send presenters an offer to start a conversation.</p>
+        <p className="mt-6 text-center text-xs text-white/40">© {new Date().getFullYear()} HireAvatar</p>
       </div>
     </div>
   );

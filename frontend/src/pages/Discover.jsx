@@ -18,7 +18,7 @@ const Banner = ({ me, openPlus }) => {
     return (
       <div className="glass rise mb-3 flex items-center gap-3 rounded-[22px] p-4" data-testid="creator-pending-banner">
         <Clock className="h-5 w-5 shrink-0 text-amber-300" />
-        <p className="text-[13px]">Your creator profile is under review. You'll get a notification once it's live.</p>
+        <p className="text-[13px]">Your presenter profile is under review. You'll get a notification once it's live.</p>
       </div>
     );
   }
@@ -29,7 +29,7 @@ const Banner = ({ me, openPlus }) => {
       <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-[#6C4CF1]"><Plus className="h-6 w-6" strokeWidth={2.6} /></span>
       <span className="relative">
         <b className="block text-[17px]">Hi {me.user.name?.split(" ")[0]}! Get started</b>
-        <span className="text-[13px] text-white/90">Become a creator or hire as a business.</span>
+        <span className="text-[13px] text-white/90">Become a presenter or hire as a business.</span>
       </span>
     </button>
   );
@@ -106,7 +106,7 @@ const Jobs = ({ loc }) => {
   const key = JSON.stringify(loc);
   useEffect(() => { setList(null); api.get("/jobs", { params: JSON.parse(key) }).then((r) => setList(r.data)); }, [api, key]);
   const interest = async (j) => {
-    if (!me.creator) return toast.error("Set up your creator profile first. Tap + to start.");
+    if (!me.creator) return toast.error("Set up your presenter profile first. Tap + to start.");
     try { await api.post(`/jobs/${j.id}/interest`, { note: "" }); setList((l) => l.map((x) => (x.id === j.id ? { ...x, applied: true } : x))); toast.success(`Interest sent to ${j.company}`); }
     catch (e) { toast.error(e?.response?.data?.detail || "Couldn't send interest"); }
   };
@@ -130,7 +130,7 @@ const Businesses = ({ saved, onToggleSave, loc }) => {
   if (!list.length) return <Empty icon={Store} title="No businesses here yet" text="Try a bigger distance or another location." testid="businesses-empty" />;
   return (
     <>
-      <p className="mb-3 text-xs text-white/75">{list.length} businesses are looking for faces. Set up a creator profile so they can send you offers.</p>
+      <p className="mb-3 text-xs text-white/75">{list.length} businesses are looking for faces. Set up a presenter profile so they can send you offers.</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="business-grid">{list.map((b, i) => <BusinessCard key={b.user_id} b={b} i={i} onOpen={setOpen} saved={saved.includes(b.user_id)} onToggleSave={onToggleSave} />)}</div>
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
         <DialogContent className="rounded-[28px] border-white/10 text-white" data-testid="business-detail-dialog">
@@ -170,7 +170,6 @@ export default function Discover({ search = false }) {
     const on = saved.includes(id);
     setSaved((s) => (on ? s.filter((x) => x !== id) : [...s, id]));
     await (on ? api.delete(`/saved/${id}`) : api.post(`/saved/${id}`, null, { params: { kind } }));
-    toast.success(on ? "Removed from saved" : "Saved");
   };
 
   return (
@@ -182,7 +181,7 @@ export default function Discover({ search = false }) {
           <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, city or category" className="rounded-full border-[1.5px] border-white/30 bg-white/15 pl-11 font-semibold" data-testid="discover-search-input" />
         </div>
       )}
-      {!search && <Seg value={tab} onChange={setTab} options={[["creators", "Creators", Users], ["businesses", "Jobs by businesses", Store]]} testid="discover-tabs" />}
+      {!search && <Seg value={tab} onChange={setTab} options={[["creators", "Presenters", Users], ["businesses", "Jobs by businesses", Store]]} testid="discover-tabs" />}
       <div className="mt-2 flex gap-2">
         {(tab === "creators" || search) && <FilterSheet filters={filters} onApply={setFilters} />}
         <LocationPill filters={filters} onChange={(l) => setFilters((f) => ({ ...f, ...l }))} />
@@ -198,10 +197,10 @@ export default function Discover({ search = false }) {
               </button>
             ))}
           </div>
-          {list && <p className="mt-3 text-xs text-white/75" data-testid="discover-count">{list.length} creators{filters.city ? ` in and around ${filters.city}${filters.radius_km ? ` (${filters.radius_km} km)` : ""}` : filters.state ? ` in ${filters.state}` : " across India"}{sort !== "recommended" ? ` · ${{ nearest: "nearest first", price_asc: "price low to high", price_desc: "price high to low", rating: "top rated", newest: "newest" }[sort]}` : ""}. Profiles marked Sample are examples.</p>}
+          {list && <p className="mt-3 text-xs text-white/75" data-testid="discover-count">{list.length} presenters{filters.city ? ` in and around ${filters.city}${filters.radius_km ? ` (${filters.radius_km} km)` : ""}` : filters.state ? ` in ${filters.state}` : " across India"}{sort !== "recommended" ? ` · ${{ nearest: "nearest first", price_asc: "price low to high", price_desc: "price high to low", rating: "top rated", newest: "newest" }[sort]}` : ""}. Profiles marked Sample are examples.</p>}
           {list === null ? <div className="grid place-items-center py-20"><Loader2 className="h-7 w-7 animate-spin" /></div>
             : list.length === 0 ? (
-              <div className="mt-4"><Empty icon={SearchX} title="No creators match" text={filters.city ? "Try a bigger distance, or choose the whole state." : "Try another location or clear your filters."} testid="discover-empty"
+              <div className="mt-4"><Empty icon={SearchX} title="No presenters match" text={filters.city ? "Try a bigger distance, or choose the whole state." : "Try another location or clear your filters."} testid="discover-empty"
                 action={<button className="mt-4 rounded-full bg-white px-5 py-2 text-sm font-bold text-[#3B25A8]" onClick={() => { setFilters(EMPTY_FILTERS); setQ(""); }}>Clear filters</button>} /></div>
             ) : (
               <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4" data-testid="creator-grid">
