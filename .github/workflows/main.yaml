@@ -31,7 +31,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Enable Yarn
+      - name: Enable Corepack
         run: corepack enable
 
       - name: Configure backend URL
@@ -54,15 +54,14 @@ jobs:
 
       - name: Build debug APK
         working-directory: frontend/android
-        run: ./gradlew assembleDebug
-
-      - name: Name and upload APK
-        run: cp frontend/android/app/build/outputs/apk/debug/app-debug.apk HireAvatar-debug.apk
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: HireAvatar-Android-debug
-          path: HireAvatar-debug.apk
+          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
