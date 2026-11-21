@@ -1,0 +1,68 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Enable Yarn
+        run: corepack enable
+
+      - name: Configure backend URL
+        env:
+          BACKEND_URL_SECRET: ${{ secrets.REACT_APP_BACKEND_URL }}
+        working-directory: frontend
+        run: |
+          BACKEND_URL="${BACKEND_URL_SECRET:-https://brandface--8c51lg3n.preview.emergentagent.com}"
+          printf 'REACT_APP_BACKEND_URL=%s\n' "$BACKEND_URL" > .env
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Build web app and sync Android
+        working-directory: frontend
+        run: |
+          yarn build
+          npx cap sync android
+
+      - name: Build debug APK
+        working-directory: frontend/android
+        run: ./gradlew assembleDebug
+
+      - name: Name and upload APK
+        run: cp frontend/android/app/build/outputs/apk/debug/app-debug.apk HireAvatar-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HireAvatar-Android-debug
+          path: HireAvatar-debug.apk
+          if-no-files-found: error
+          retention-days: 14
