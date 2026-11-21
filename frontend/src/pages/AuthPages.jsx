@@ -1,9 +1,11 @@
 import { SignIn, SignUp } from "@clerk/react";
 import { useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import { authEvent } from "@/lib/track";
 import { ArrowLeft, Video, IndianRupee, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/Logo";
+import NativeAuthScreen from "@/components/auth/NativeAuthScreen";
 
 const Chip = ({ icon: Icon, text, delay }) => (
   <span className="floaty glass inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold" style={{ animationDelay: delay }}>
@@ -35,14 +37,39 @@ const Shell = ({ children, testid, title }) => {
   );
 };
 
-export const SignInPage = () => (
-  <Shell testid="sign-in-page" title={<>Be the face of a brand.<br />Or find yours.</>}>
-    <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" withSignUp oauthFlow="popup" fallbackRedirectUrl="co.hireavatar.app://auth/callback" />
-  </Shell>
-);
+export const SignInPage = () => {
+  if (Capacitor.isNativePlatform()) {
+    return <NativeAuthScreen mode="sign-in" />;
+  }
 
-export const SignUpPage = () => (
-  <Shell testid="sign-up-page" title={<>Join HireAvatar.<br />It takes a minute.</>}>
-    <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" oauthFlow="popup" fallbackRedirectUrl="co.hireavatar.app://auth/callback" />
-  </Shell>
-);
+  return (
+    <Shell testid="sign-in-page" title={<>Be the face of a brand.<br />Or find yours.</>}>
+      <SignIn
+        routing="path"
+        path="/sign-in"
+        signUpUrl="/sign-up"
+        withSignUp
+        oauthFlow="popup"
+        fallbackRedirectUrl="/app"
+      />
+    </Shell>
+  );
+};
+
+export const SignUpPage = () => {
+  if (Capacitor.isNativePlatform()) {
+    return <NativeAuthScreen mode="sign-up" />;
+  }
+
+  return (
+    <Shell testid="sign-up-page" title={<>Join HireAvatar.<br />It takes a minute.</>}>
+      <SignUp
+        routing="path"
+        path="/sign-up"
+        signInUrl="/sign-in"
+        oauthFlow="popup"
+        fallbackRedirectUrl="/app"
+      />
+    </Shell>
+  );
+};

@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/react";
+import { useAuth } from "@/lib/clerk";
 import { Link, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { ShieldCheck, Play, Store, Video, CalendarClock, Crown, ChevronRight } from "lucide-react";

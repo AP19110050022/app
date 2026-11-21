@@ -1,0 +1,2 @@
+openjdk-17-jdk=17.0.21.1+2-1~deb12u1
+qemu-user=1:7.2+dfsg-7+deb12u18+b3

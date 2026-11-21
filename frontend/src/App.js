@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Show } from "@clerk/react";
+import { Show } from "@/lib/clerk";
 import ClerkAuthProvider from "@/components/auth/ClerkAuthProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { MeProvider } from "@/context/MeContext";

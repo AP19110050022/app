@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClerkProvider } from "@clerk/react";
-import { App as CapacitorApp } from "@capacitor/app";
+import { ClerkProvider as NativeClerkProvider } from "capacitor-clerk";
 import { Capacitor } from "@capacitor/core";
+import { ClerkProvider as WebClerkProvider } from "@clerk/react";
+import { ClerkHooksBridge } from "@/lib/clerk";
 
 const appearance = {
   variables: {
@@ -26,21 +27,6 @@ export default function ClerkAuthProvider({ children }) {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [unavailable, setUnavailable] = useState(false);
-
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-
-    let handle;
-    CapacitorApp.addListener("appUrlOpen", (event) => {
-      if (!event.url.startsWith("co.hireavatar.app://")) return;
-
-      const callback = new URL(event.url);
-      const destination = callback.pathname === "/app" ? `/app${callback.search}${callback.hash}` : "/app";
-      navigate(destination, { replace: true });
-    }).then((listener) => { handle = listener; });
-
-    return () => handle?.remove();
-  }, [navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,8 +55,16 @@ export default function ClerkAuthProvider({ children }) {
     </div>
   );
   if (!config) return null;
+  if (isNative) {
+    return (
+      <NativeClerkProvider publishableKey={config.publishable_key}>
+        <ClerkHooksBridge>{children}</ClerkHooksBridge>
+      </NativeClerkProvider>
+    );
+  }
+
   return (
-    <ClerkProvider
+    <WebClerkProvider
       publishableKey={config.publishable_key}
       proxyUrl={config.proxy_url || undefined}
       appearance={appearance}
@@ -86,7 +80,7 @@ export default function ClerkAuthProvider({ children }) {
       signUpFallbackRedirectUrl={isNative ? "co.hireavatar.app://auth/callback" : "/app"}
       afterSignOutUrl="/"
     >
-      {children}
-    </ClerkProvider>
+      <ClerkHooksBridge>{children}</ClerkHooksBridge>
+    </WebClerkProvider>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
-import { useClerk } from "@clerk/react";
+import { useClerk } from "@/lib/clerk";
 import { ArrowLeft, Compass, Plus, Briefcase, MessageCircle, User, Bell, Search, Loader2, Bookmark, ShieldCheck, Ban } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { RoleChooser } from "@/components/RoleChooser";

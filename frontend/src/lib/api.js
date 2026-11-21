@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useMemo } from "react";
-import { useAuth } from "@clerk/react";
+import { useAuth } from "@/lib/clerk";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export const publicApi = axios.create({ baseURL: API });

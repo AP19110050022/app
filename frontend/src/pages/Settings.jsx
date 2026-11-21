@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useClerk, useUser } from "@clerk/react";
+import { useClerk, useUser } from "@/lib/clerk";
 import { toast } from "sonner";
 import { ArrowLeft, Bell, Wallet, Shield, HelpCircle, FileText, LogOut, Trash2, Receipt } from "lucide-react";
 import { Input } from "@/components/ui/input";
