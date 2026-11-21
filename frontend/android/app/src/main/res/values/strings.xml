@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">HireAvatar</string>
+    <string name="title_activity_main">HireAvatar</string>
+    <string name="package_name">co.hireavatar.app</string>
+    <string name="custom_url_scheme">co.hireavatar.app</string>
+</resources>

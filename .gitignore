@@ -31,7 +31,10 @@ dist/
 dist
 
 # Environment files (comprehensive coverage)
-
+.env
+.env.*
+**/.env
+**/.env.*
 *token.json*
 *credentials.json*
 
@@ -80,6 +83,10 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
+*.apk
+*.aab
+*.keystore
+*.jks
 
 # overlay black-box crash/user-report dumps — session data, never history
 **/.emergent/recordings/

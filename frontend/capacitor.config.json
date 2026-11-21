@@ -1,0 +1,11 @@
+{
+  "appId": "co.hireavatar.app",
+  "appName": "HireAvatar",
+  "webDir": "build",
+  "ios": {
+    "contentInset": "automatic"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

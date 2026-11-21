@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@capacitor/android": "^8",
+    "@capacitor/core": "^8",
+    "@capacitor/ios": "^8",
     "@clerk/react": "6.17.0",
     "@hookform/resolvers": "5.0.1",
     "@radix-ui/react-accordion": "1.2.8",
@@ -64,7 +67,13 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "test": "craco test"
+    "test": "craco test",
+    "cap:sync": "yarn build && cap sync",
+    "cap:sync:ios": "yarn build && cap sync ios",
+    "cap:sync:android": "yarn build && cap sync android",
+    "cap:assets": "capacitor-assets generate --ios --android --iconBackgroundColor '#FFFFFF' --splashBackgroundColor '#2A1B7A'",
+    "cap:open:ios": "cap open ios",
+    "cap:open:android": "cap open android"
   },
   "browserslist": {
     "production": [
@@ -80,6 +89,8 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",
+    "@capacitor/assets": "^4",
+    "@capacitor/cli": "^8",
     "@craco/craco": "7.1.0",
     "@emergentbase/overlay": "https://assets.emergent.sh/npm/emergentbase-overlay-0.1.31.tgz",
     "@emergentbase/visual-edits": "https://assets.emergent.sh/npm/emergentbase-visual-edits-1.0.17.tgz",
