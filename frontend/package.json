@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@capacitor/android": "^8",
+    "@capacitor/app": "^8",
     "@capacitor/core": "^8",
     "@capacitor/ios": "^8",
     "@clerk/react": "6.17.0",

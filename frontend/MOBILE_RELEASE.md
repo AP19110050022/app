@@ -17,7 +17,7 @@ For iOS, use macOS with Xcode and CocoaPods, then run `yarn cap:open:ios`. Selec
 
 ## Before submission
 
-- Test account creation, sign-in, sign-out, session restore, and any social sign-in on physical iOS and Android devices. Configure Clerk’s OAuth redirect/deep-link settings if a provider returns to the browser instead of the app.
+- Test account creation, sign-in, sign-out, session restore, and social sign-in on physical iOS and Android devices. In Clerk Dashboard, add `co.hireavatar.app://auth/callback` as an allowed redirect URL and configure the app’s custom URL scheme for each OAuth provider. The app uses popup OAuth and routes callbacks back into the native app.
 - Test real payment flows on both platforms. Apple and Google may require their in-app purchase APIs for digital subscriptions or app features; external checkout is generally for physical goods and services. Confirm the classification of every paid offering before submission.
 - Provide store listing screenshots, privacy policy and support URLs, age ratings, App Privacy/Data safety disclosures, and review credentials where required.
 - Verify backend CORS, authentication callbacks, file uploads, and payment return URLs against the production domains.

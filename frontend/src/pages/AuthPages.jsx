@@ -37,12 +37,12 @@ const Shell = ({ children, testid, title }) => {
 
 export const SignInPage = () => (
   <Shell testid="sign-in-page" title={<>Be the face of a brand.<br />Or find yours.</>}>
-    <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" withSignUp />
+    <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" withSignUp oauthFlow="popup" fallbackRedirectUrl="co.hireavatar.app://auth/callback" />
   </Shell>
 );
 
 export const SignUpPage = () => (
   <Shell testid="sign-up-page" title={<>Join HireAvatar.<br />It takes a minute.</>}>
-    <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" />
+    <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" oauthFlow="popup" fallbackRedirectUrl="co.hireavatar.app://auth/callback" />
   </Shell>
 );

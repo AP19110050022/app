@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ClerkProvider } from "@clerk/react";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 
 const appearance = {
   variables: {
@@ -26,6 +28,21 @@ export default function ClerkAuthProvider({ children }) {
   const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let handle;
+    CapacitorApp.addListener("appUrlOpen", (event) => {
+      if (!event.url.startsWith("co.hireavatar.app://")) return;
+
+      const callback = new URL(event.url);
+      const destination = callback.pathname === "/app" ? `/app${callback.search}${callback.hash}` : "/app";
+      navigate(destination, { replace: true });
+    }).then((listener) => { handle = listener; });
+
+    return () => handle?.remove();
+  }, [navigate]);
+
+  useEffect(() => {
     let cancelled = false;
     const load = async (attempt = 0) => {
       try {
@@ -39,6 +56,8 @@ export default function ClerkAuthProvider({ children }) {
     load();
     return () => { cancelled = true; };
   }, []);
+
+  const isNative = Capacitor.isNativePlatform();
 
   if (unavailable) return (
     <div className="grid min-h-screen place-items-center px-6 text-center text-white" data-testid="signin-unavailable">
@@ -63,8 +82,8 @@ export default function ClerkAuthProvider({ children }) {
       routerReplace={(to) => navigate(to, { replace: true })}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
-      signInFallbackRedirectUrl="/app"
-      signUpFallbackRedirectUrl="/app"
+      signInFallbackRedirectUrl={isNative ? "co.hireavatar.app://auth/callback" : "/app"}
+      signUpFallbackRedirectUrl={isNative ? "co.hireavatar.app://auth/callback" : "/app"}
       afterSignOutUrl="/"
     >
       {children}
