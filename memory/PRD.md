@@ -35,9 +35,13 @@ One account, + chooser (creator 3 steps / business 2 steps); 3 plans Per Video /
 
 - Iteration 7: Sign-in health check (auth_events: login page, signed in, couldn't finish, sent back to login, blocked; per day in IST and per web address; red alert when today's failure rate ≥20%). Live loop root cause (deployer): Emergent-managed production Clerk instance still bound to brandface.emergent.host — needs Emergent support (support@emergent.sh) to add www.hireavatar.co/hireavatar.co; user should enable root domain redirect in Deployment → Domains.
 
+- Iteration 8 (native companion auth, 2026-11-21): Android and iPhone Capacitor shells use app ID `co.hireavatar.app`, register the `co.hireavatar.app://auth/callback` scheme, and enable CapacitorHttp. Added the `capacitor-clerk` secure-storage bridge: native users have Google SSO through the system browser plus email/password sign-in, email sign-up verification, and email second-factor verification. Browser auth remains on Clerk's prebuilt screens and returns to `/app`, never the native callback. Native projects synchronized; web build passed; browser auth was visually checked at desktop/mobile; Android Gradle reached SDK resolution after Kotlin configuration but cannot assemble in this container because no Android SDK is installed. The managed production Clerk allowlist still requires a platform-side addition of the callback URL.
+
 ## Backlog
 - P2 (admin): growth charts, spreadsheet export, broadcast announcements, verified-badge control
 - P3 (admin): finer helper roles, auto-flagging, daily admin email summary
 - P0: Add Razorpay keys (payments currently MOCKED test mode); set ADMIN_EMAIL.
+- P0: Platform-side Clerk allowlist: add `co.hireavatar.app://auth/callback` for the native app; separately complete the pending `www.hireavatar.co` custom-domain rebind.
 - P1: Phone OTP login, automatic payouts (Razorpay Route), email alerts, calendar date picker in offer dialog.
-- P2: Featured boost, AI matching, PDF contracts/invoices, mobile apps, multi-currency.
+- P2: Featured boost, AI matching, PDF contracts/invoices, multi-currency.
+- P2: Produce signed Android/iOS binaries on a workstation with Android SDK/Xcode; iOS also needs the capacitor-clerk Swift package linked in Xcode.

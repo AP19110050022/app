@@ -20,7 +20,7 @@ const Shell = ({ children, testid, title }) => {
     <Link to="/" aria-label="Back to home" title="Back to home" className="fixed left-4 top-4 z-50 grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-white/10 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
       <ArrowLeft className="h-5 w-5" />
     </Link>
-    <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-10 px-5 py-10 lg:flex-row lg:justify-between">
+    <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-10 px-5 pb-10 pt-24 sm:py-10 lg:flex-row lg:justify-between">
       <div className="w-full max-w-[400px] lg:max-w-md">
         <Logo size="text-[34px]" />
         <h1 className="mt-5 text-[30px] font-extrabold leading-[1.1] tracking-tight sm:text-[40px]">{title}</h1>

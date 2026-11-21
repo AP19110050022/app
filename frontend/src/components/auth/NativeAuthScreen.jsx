@@ -91,6 +91,8 @@ export default function NativeAuthScreen({ mode }) {
   const [code, setCode] = useState("");
   const [ssoLoading, setSsoLoading] = useState(false);
   const [ssoError, setSsoError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [needsSecondFactor, setNeedsSecondFactor] = useState(false);
 
   const complete = async (resource) => {
     await resource.finalize({
@@ -121,13 +123,59 @@ export default function NativeAuthScreen({ mode }) {
 
   const signInWithEmail = async (event) => {
     event.preventDefault();
+    setFormError("");
     const result = await signIn?.password({ identifier: email, password });
 
-    if (result?.error || signIn?.status !== "complete") {
+    if (result?.error || !signIn) {
       return;
     }
 
-    await complete(signIn);
+    await signIn.reload();
+    if (signIn.status === "complete") {
+      await complete(signIn);
+      return;
+    }
+
+    if (signIn.status !== "needs_second_factor") {
+      setFormError("This sign-in needs another verification step. Please try Google instead.");
+      return;
+    }
+
+    const canEmailVerify = signIn.supportedSecondFactors?.some(
+      (factor) => factor.strategy === "email_code",
+    );
+    if (!canEmailVerify) {
+      setFormError("Your account needs a verification method that is not available in this app yet.");
+      return;
+    }
+
+    try {
+      await signIn.prepareSecondFactor({ strategy: "email_code" });
+      setNeedsSecondFactor(true);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "We could not send your verification code.");
+    }
+  };
+
+  const verifySecondFactor = async (event) => {
+    event.preventDefault();
+    setFormError("");
+    const result = await signIn?.attemptSecondFactor({
+      strategy: "email_code",
+      code,
+    });
+
+    if (result?.error || !signIn) {
+      return;
+    }
+
+    await signIn.reload();
+    if (signIn.status === "complete") {
+      await complete(signIn);
+      return;
+    }
+
+    setFormError("That code could not finish sign-in. Request a new code and try again.");
   };
 
   const createAccount = async (event) => {
@@ -157,6 +205,47 @@ export default function NativeAuthScreen({ mode }) {
     && signUp?.unverifiedFields?.includes("email_address");
   const errors = mode === "sign-up" ? signUpErrors : signInErrors;
   const loading = mode === "sign-up" ? signUpStatus === "fetching" : signInStatus === "fetching";
+
+  if (needsSecondFactor) {
+    return (
+      <AuthFrame mode={mode} onBack={() => setNeedsSecondFactor(false)}>
+        <form onSubmit={verifySecondFactor} data-testid="native-auth-second-factor-form" className="space-y-5">
+          <div>
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#B35CFF]/25 text-[#F1DDFF]">
+              <Mail className="h-5 w-5" />
+            </span>
+            <h2 className="mt-3 text-xl font-extrabold">Verify this device</h2>
+            <p className="mt-1 text-sm text-white/70">Enter the code sent to your email address.</p>
+          </div>
+          <Field
+            label="Verification code"
+            testid="native-auth-second-factor-code-input"
+            inputMode="numeric"
+            value={code}
+            onChange={setCode}
+          />
+          {formError && <ErrorText>{formError}</ErrorText>}
+          <button
+            type="submit"
+            disabled={loading}
+            data-testid="native-auth-second-factor-submit-button"
+            className="cta flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-extrabold disabled:opacity-70"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            Verify and continue
+          </button>
+          <button
+            type="button"
+            onClick={() => void signIn?.prepareSecondFactor({ strategy: "email_code" })}
+            data-testid="native-auth-second-factor-resend-button"
+            className="w-full text-sm font-bold text-white/80 underline underline-offset-4"
+          >
+            Send another code
+          </button>
+        </form>
+      </AuthFrame>
+    );
+  }
 
   if (isVerification) {
     return (
@@ -226,7 +315,9 @@ export default function NativeAuthScreen({ mode }) {
           value={password}
           onChange={setPassword}
         />
-        {(ssoError || errorMessage(errors)) && <ErrorText>{ssoError || errorMessage(errors)}</ErrorText>}
+        {(ssoError || formError || errorMessage(errors)) && (
+          <ErrorText>{ssoError || formError || errorMessage(errors)}</ErrorText>
+        )}
         <button
           type="submit"
           disabled={loading || ssoLoading}

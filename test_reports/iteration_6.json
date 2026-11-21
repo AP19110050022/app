@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only check of the native HireAvatar Capacitor auth work, using the browser and the config files. /sign-in and /sign-up both show the Clerk UI (Google + email; the sign-up form has password) at 1920x1080 and 390x844. Neither page was blank, scrolled sideways or showed the native screen in the browser. Console had no errors, only warnings (Clerk dev keys, Clerk structural CSS, PostHog bot filter, 'No available adapters' from a third-party script). The callback co.hireavatar.app:// is not in the browser DOM and the web <SignIn>/<SignUp> use fallbackRedirectUrl=/app. capacitor.config.json has appId co.hireavatar.app and CapacitorHttp enabled. AndroidManifest has a VIEW/BROWSABLE intent-filter with scheme co.hireavatar.app (activity singleTask). iOS Info.plist has CFBundleURLTypes for co.hireavatar.app. yarn build passed (Compiled successfully, 21.7s). Android capacitor gradle includes capacitor-clerk and secure-storage. Not tested: native Google/email sign-in on a device, Gradle/Xcode builds, automated Clerk sign-in (all as instructed).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/sign-up at 390x844 (mobile)", "issues": ["The fixed back button (top-4 left-4) overlaps the HireAvatar logo. The tall sign-up content is vertically centred, so the logo sits at about y=45-90, under the 44px button. Add top padding (e.g. pt-20 on mobile) to the Shell container. /sign-in on mobile is fine."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Minor: on mobile /sign-up, add top padding so the fixed back button does not overlap the logo.",
+    "Native email sign-in (NativeAuthScreen.signInWithEmail): if signIn.status is not 'complete' (e.g. needs_second_factor or needs_client_trust / new-device verification), the function returns silently and the user is stuck with no message. Handle those statuses or show a message.",
+    "Native: check on a real device that the signIn/signUp status read right after an awaited call is current, not a stale render-closure value. Otherwise a first tap may not finalize."
+  ],
+  "critical_code_review_comments": [
+    "ClerkAuthProvider.jsx lines 79-80: the isNative ternary inside WebClerkProvider is dead code, because the native branch returns earlier. It is harmless (the web always gets /app), but it can be simplified to '/app'.",
+    "NativeAuthScreen: createAccount ignores errors from sendEmailCode, and the resend button gives no feedback.",
+    "@capawesome/capacitor-apple-sign-in (an optional peer) is not installed. This is fine because Apple sign-in is not used, but App Store review may expect Sign in with Apple when Google sign-in is offered (Guideline 4.8).",
+    "Clerk warns about structural CSS (cl-formFieldInput / cl-socialButtonsBlockButton overrides); consider pinning @clerk/ui."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% of the 7 requested checks passed; 1 minor design issue"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The app is React + Capacitor 8 with capacitor-clerk 0.8.3 and @clerk/react 6.17.0. The web shows Clerk <SignIn withSignUp> (combined flow, so there is no separate Sign up link on /sign-in). Native screens (data-testid native-auth-*) only render when Capacitor.isNativePlatform(), so they cannot be tested in a browser. No Android SDK in the container."
+}
